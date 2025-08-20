@@ -1,0 +1,19 @@
+[[scopes]]
+name = "lexer"
+description = "The scope for the lexer"
+
+[[scopes]]
+name = "ast"
+description = "The scope for the AST"
+
+[[scopes]]
+name = "parser"
+description = "The scope for the parser"
+
+[[scopes]]
+name = "core"
+description = "The scope for the core"
+
+[[scopes]]
+name = "common"
+description = "The scope for common utilities"
