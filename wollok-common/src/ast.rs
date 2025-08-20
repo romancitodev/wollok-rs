@@ -2,35 +2,28 @@ use std::fmt;
 use wollok_lexer::token::Literal;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum AstExpr {
+pub enum Expr {
     Ident(String),
     Literal(Literal),
     BinaryExpr {
-        op: AstBinaryOp,
-        left: Box<AstExpr>,
-        right: Box<AstExpr>,
+        op: BinaryOp,
+        left: Box<Expr>,
+        right: Box<Expr>,
     },
     UnaryExpr {
-        op: AstUnaryOp,
-        expr: Box<AstExpr>,
+        op: UnaryOp,
+        expr: Box<Expr>,
     },
-    Array(Vec<AstExpr>),
-    Object(Vec<(String, AstExpr)>),
-    Interpolation {
-        expr: Box<AstExpr>, // we moved the type cast into a `AstExpr::Cast` to be able to track it
-    },
+    Array(Vec<Expr>),
+    Object(Vec<(String, Expr)>),
     FunctionCall {
         name: String,
-        args: Vec<AstExpr>,
-    },
-    Cast {
-        expr: Box<AstExpr>,
-        ty: String,
+        args: Vec<Expr>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum AstBinaryOp {
+pub enum BinaryOp {
     Eq,  // ==
     Ne,  // !=
     And, // &&
@@ -38,55 +31,55 @@ pub enum AstBinaryOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum AstUnaryOp {
+pub enum UnaryOp {
     Not,
 }
 
-impl From<i64> for AstExpr {
+impl From<i64> for Expr {
     fn from(val: i64) -> Self {
-        AstExpr::Literal(Literal::Integer(val))
+        Expr::Literal(Literal::Integer(val))
     }
 }
 
-impl From<f64> for AstExpr {
+impl From<f64> for Expr {
     fn from(val: f64) -> Self {
-        AstExpr::Literal(Literal::Float(val))
+        Expr::Literal(Literal::Float(val))
     }
 }
 
-impl From<&str> for AstExpr {
+impl From<&str> for Expr {
     fn from(val: &str) -> Self {
-        AstExpr::Literal(Literal::String(val.to_owned()))
+        Expr::Literal(Literal::String(val.to_owned()))
     }
 }
 
-impl From<String> for AstExpr {
+impl From<String> for Expr {
     fn from(val: String) -> Self {
-        AstExpr::Literal(Literal::String(val))
+        Expr::Literal(Literal::String(val))
     }
 }
 
-impl From<bool> for AstExpr {
+impl From<bool> for Expr {
     fn from(val: bool) -> Self {
-        AstExpr::Literal(Literal::Boolean(val))
+        Expr::Literal(Literal::Boolean(val))
     }
 }
 
-impl fmt::Display for AstBinaryOp {
+impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AstBinaryOp::Eq => write!(f, "=="),
-            AstBinaryOp::Ne => write!(f, "!="),
-            AstBinaryOp::And => write!(f, "&&"),
-            AstBinaryOp::Or => write!(f, "||"),
+            BinaryOp::Eq => write!(f, "=="),
+            BinaryOp::Ne => write!(f, "!="),
+            BinaryOp::And => write!(f, "&&"),
+            BinaryOp::Or => write!(f, "||"),
         }
     }
 }
 
-impl fmt::Display for AstUnaryOp {
+impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AstUnaryOp::Not => write!(f, "!"),
+            UnaryOp::Not => write!(f, "!"),
         }
     }
 }
