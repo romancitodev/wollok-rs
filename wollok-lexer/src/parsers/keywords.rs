@@ -24,6 +24,8 @@ impl TokenParser for KeywordParser {
             "let".value(Keyword::Let),
             "self".value(Keyword::This), // Using `self` as a keyword
             "property".value(Keyword::Property),
+            "super".value(Keyword::Super),
+            "return".value(Keyword::Return),
         ))
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))

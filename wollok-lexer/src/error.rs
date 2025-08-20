@@ -14,10 +14,10 @@ pub type Result<'err, T = ()> = std::result::Result<T, LexerErr<'err>>;
 
 #[derive(Debug)]
 pub struct LexerErr<'e> {
-    base: &'e str,
-    span: Span,
-    labels: Vec<(Span, String)>,
-    backtrace: Backtrace,
+    pub base: &'e str,
+    pub span: Span,
+    pub labels: Vec<(Span, String)>,
+    pub backtrace: Backtrace,
 }
 
 pub trait LexerExt<'lex> {

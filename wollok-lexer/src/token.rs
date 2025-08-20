@@ -150,6 +150,7 @@ pub enum Punctuation {
     Or,     // ||
     Bang,   // !, used for negation
 
+    Arrow,
     Newline,
     Identation,
     OpenBrace,
@@ -185,6 +186,7 @@ impl fmt::Display for Punctuation {
             Punctuation::Or => "||",
             Punctuation::Bang => "!",
 
+            Punctuation::Arrow => "->",
             Punctuation::Newline => "\n",
             Punctuation::Identation => "\t",
             Punctuation::OpenBrace => "{",
@@ -234,6 +236,8 @@ pub enum Keyword {
     Test,
     This, // Actually this is `Self`
     Property,
+    Super,
+    Return,
 }
 
 impl fmt::Display for Keyword {
@@ -252,6 +256,8 @@ impl fmt::Display for Keyword {
             Keyword::Assert => "assert",
             Keyword::This => "self",
             Keyword::Property => "property",
+            Keyword::Super => "super",
+            Keyword::Return => "return",
         };
         write!(f, "{keyword}")
     }

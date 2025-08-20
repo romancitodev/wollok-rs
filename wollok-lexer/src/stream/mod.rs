@@ -120,6 +120,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_full_example() {
+        let source = "import trenes.*
+
+class Deposito {
+  const formaciones = []
+  method agregarFormacion(unTren) { formaciones.add(unTren) }
+  method vagonesMasPesados() { return formaciones.map({ tren -> tren.vagonMasPesado() }) }
+}
+";
+        let stream = TokenStream::new(source);
+        let tokens = stream.collect_all();
+
+        println!("{tokens:?}");
+
+        if let Err(err) = tokens {
+            eprintln!("{:?}", err.span);
+            panic!();
+        } else {
+            assert!(tokens.is_ok());
+        }
+
+        // assert_eq!(
+        //     tokens,
+        //     vec![
+        //         kw!(Import),
+        //         ident!("trenes"),
+        //         T!(Dot),
+        //         T!(Multiply),
+        //         T!(Newline)
+        //     ]
+        // );
+    }
+
+    #[test]
     fn test_class_example() {
         let source = "class Animal { property energy = 10 }";
         let stream = TokenStream::new(source);

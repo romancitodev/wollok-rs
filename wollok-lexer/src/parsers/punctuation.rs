@@ -12,6 +12,7 @@ impl TokenParser for PunctuationParser {
     fn parse<'t>(input: &mut Src<'t>) -> Result<'t, Option<SpannedToken>> {
         alt([
             // Operadores de dos caracteres primero
+            "->".value(Punctuation::Arrow),
             "==".value(Punctuation::Eq),
             "!=".value(Punctuation::Ne),
             "&&".value(Punctuation::And),
