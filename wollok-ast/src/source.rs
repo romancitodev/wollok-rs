@@ -168,3 +168,11 @@ impl PeekedToken<'_, '_> {
         self.src.tokens.push_front(self.token);
     }
 }
+
+impl std::ops::Deref for PeekedToken<'_, '_> {
+    type Target = SpannedToken;
+
+    fn deref(&self) -> &Self::Target {
+        &self.token
+    }
+}
