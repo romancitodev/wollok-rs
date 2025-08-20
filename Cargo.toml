@@ -1,0 +1,12 @@
+[package]
+name = "wollok_rs"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["wollok-*"]
+
+[workspace.dependencies]
+ariadne = { version = "0.5.1", features = ["auto-color"] }
+
+[dependencies]

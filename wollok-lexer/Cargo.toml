@@ -1,0 +1,8 @@
+[package]
+name = "wollok-lexer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+winnow = "0.7.12"
+ariadne.workspace = true
