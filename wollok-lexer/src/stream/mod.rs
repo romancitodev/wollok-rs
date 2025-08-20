@@ -120,6 +120,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_class_example() {
+        let source = "class Animal { property energy = 10 }";
+        let stream = TokenStream::new(source);
+        let tokens = stream.collect_all().unwrap();
+
+        assert_eq!(
+            tokens,
+            vec![
+                kw!(Class),
+                ident!("Animal"),
+                T!(OpenBrace),
+                kw!(Property),
+                ident!("energy"),
+                T!(Equals),
+                lit!(10),
+                T!(CloseBrace)
+            ]
+        );
+    }
+
+    #[test]
     fn test_self_example() {
         let source = "object dummy { method run() = self }";
         let stream = TokenStream::new(source);
