@@ -22,6 +22,7 @@ impl TokenParser for KeywordParser {
             "assert".value(Keyword::Assert),
             "const".value(Keyword::Const),
             "let".value(Keyword::Let),
+            "self".value(Keyword::This), // Using `self` as a keyword
         ))
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))

@@ -232,6 +232,7 @@ pub enum Keyword {
     Describe,
     Assert,
     Test,
+    This, // Actually this is `Self`
 }
 
 impl fmt::Display for Keyword {
@@ -248,6 +249,7 @@ impl fmt::Display for Keyword {
             Keyword::Test => "test",
             Keyword::Describe => "describe",
             Keyword::Assert => "assert",
+            Keyword::This => "self",
         };
         write!(f, "{keyword}")
     }

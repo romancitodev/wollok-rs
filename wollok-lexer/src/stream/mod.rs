@@ -120,6 +120,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_self_example() {
+        let source = "object dummy { method run() = self }";
+        let stream = TokenStream::new(source);
+        let tokens = stream.collect_all().unwrap();
+        assert_eq!(
+            tokens,
+            vec![
+                kw!(Object),
+                ident!("dummy"),
+                T!(OpenBrace),
+                kw!(Method),
+                ident!("run"),
+                T!(OpenParen),
+                T!(CloseParen),
+                T!(Equals),
+                kw!(This),
+                T!(CloseBrace)
+            ]
+        );
+    }
+
+    #[test]
     fn test_code_example() {
         let source = "object dummy {\n\tconst age = 42 }";
         let stream = TokenStream::new(source);
