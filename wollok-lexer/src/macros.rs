@@ -1,6 +1,7 @@
 use crate::token::Literal;
 
 #[macro_export]
+#[doc(hidden)]
 macro_rules! ident {
     (@expr $i:expr) => {
       $crate::token::Token::Ident($i)
@@ -19,7 +20,11 @@ macro_rules! ident {
     };
 }
 
+#[doc(inline)]
+pub use ident;
+
 #[macro_export]
+#[doc(hidden)]
 macro_rules! lit {
     (Null) => {
         $crate::token::Token::Literal($crate::token::Literal::Null)
@@ -32,14 +37,22 @@ macro_rules! lit {
     };
 }
 
+#[doc(inline)]
+pub use lit;
+
 #[macro_export]
+#[doc(hidden)]
 macro_rules! cmt {
     ($i:expr) => {
         $crate::token::Token::Comment($i.to_owned())
     };
 }
 
+#[doc(inline)]
+pub use cmt;
+
 #[macro_export]
+#[doc(hidden)]
 macro_rules! T {
   (@raw $i:ident) => {
     $crate::token::Punctuation::$i
@@ -49,7 +62,11 @@ macro_rules! T {
   }
 }
 
+#[doc(inline)]
+pub use T;
+
 #[macro_export]
+#[doc(hidden)]
 macro_rules! kw {
   (@raw $i:ident) => {
     $crate::token::Keyword::$i
@@ -61,6 +78,9 @@ macro_rules! kw {
     $crate::token::Token::Keyword($crate::token::Keyword::Template($i))
   }
 }
+
+#[doc(inline)]
+pub use kw;
 
 impl From<i64> for Literal {
     fn from(value: i64) -> Self {
