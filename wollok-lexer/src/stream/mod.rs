@@ -45,8 +45,8 @@ impl<'t> TokenStream<'t> {
             KeywordParser::parse,     // Keywords antes que identifiers
             LiteralParser::parse,     // Literales (números, strings, booleans)
             IdentifierParser::parse,  // Identificadores
-            OperatorParser::parse,    // Operadores
             PunctuationParser::parse, // Puntuación
+            OperatorParser::parse,    // Operadores
         ))
         .parse_next(&mut self.input);
 
@@ -130,27 +130,67 @@ class Deposito {
 }
 ";
         let stream = TokenStream::new(source);
-        let tokens = stream.collect_all();
+        let tokens = stream.collect_all().unwrap();
 
-        println!("{tokens:?}");
-
-        if let Err(err) = tokens {
-            eprintln!("{:?}", err.span);
-            panic!();
-        } else {
-            assert!(tokens.is_ok());
-        }
-
-        // assert_eq!(
-        //     tokens,
-        //     vec![
-        //         kw!(Import),
-        //         ident!("trenes"),
-        //         T!(Dot),
-        //         T!(Multiply),
-        //         T!(Newline)
-        //     ]
-        // );
+        assert_eq!(
+            tokens,
+            vec![
+                kw!(Import),
+                ident!("trenes"),
+                T!(Dot),
+                T!(Multiply),
+                T!(Newline),
+                T!(Newline),
+                kw!(Class),
+                ident!("Deposito"),
+                T![OpenBrace],
+                T![Newline],
+                kw!(Const),
+                ident!("formaciones"),
+                T![Equals],
+                T![OpenSquareBracket],
+                T![CloseSquareBracket],
+                T![Newline],
+                kw!(Method),
+                ident!("agregarFormacion"),
+                T![OpenParen],
+                ident!("unTren"),
+                T![CloseParen],
+                T![OpenBrace],
+                ident!("formaciones"),
+                T![Dot],
+                ident!("add"),
+                T![OpenParen],
+                ident!("unTren"),
+                T![CloseParen],
+                T![CloseBrace],
+                T![Newline],
+                kw!(Method),
+                ident!("vagonesMasPesados"),
+                T![OpenParen],
+                T![CloseParen],
+                T![OpenBrace],
+                kw![Return],
+                ident!("formaciones"),
+                T![Dot],
+                ident!("map"),
+                T![OpenParen],
+                T![OpenBrace],
+                ident!("tren"),
+                T![Arrow],
+                ident!("tren"),
+                T![Dot],
+                ident!("vagonMasPesado"),
+                T![OpenParen],
+                T![CloseParen],
+                T![CloseBrace],
+                T![CloseParen],
+                T![CloseBrace],
+                T![Newline],
+                T![CloseBrace],
+                T![Newline]
+            ]
+        );
     }
 
     #[test]

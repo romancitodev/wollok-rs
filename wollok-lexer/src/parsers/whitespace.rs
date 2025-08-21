@@ -10,11 +10,7 @@ pub struct WhitespaceParser;
 
 impl TokenParser for WhitespaceParser {
     fn parse<'t>(input: &mut Src<'t>) -> Result<'t, Option<SpannedToken>> {
-        // Solo parseamos espacios y tabs, no newlines (esos son punctuation)
-        let result = take_while(1.., |c: char| c == ' ' || c == '\t').parse_next(input)?;
-
-        println!("{result}");
-        // Retornamos None para indicar que el whitespace debe ser ignorado
+        _ = take_while(1.., |c: char| c == ' ' || c == '\t').parse_next(input)?;
         Ok(None)
     }
 }
