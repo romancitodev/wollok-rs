@@ -1,25 +1,23 @@
-use crate::ast::Scope;
-use wollok_lexer::lexer::TokenStream;
-
-fn parse(input: &'_ str) -> Scope {
-    Scope::from_tokens(input, TokenStream::new(input))
-}
-
 #[cfg(test)]
 mod ast {
+
+    #[must_use]
+    fn parse(input: &'_ str) -> Scope {
+        Scope::from_tokens(input, TokenStream::new(input))
+    }
+
+    use wollok_lexer::lexer::TokenStream;
+
     use crate::{
-        ast::Stmt,
+        ast::{Scope, Stmt},
         expr::{Expr, ExprArray, ExprLit},
         item::{Item, ItemConst},
     };
-
-    use super::*;
 
     #[test]
     fn test_array_parse() {
         let input = "const items = [1, 2, 3]";
         let scope = parse(input);
-        println!("{scope:#?}");
         assert_eq!(
             *scope,
             vec![Stmt::Item(Item::Const(ItemConst {
@@ -31,6 +29,19 @@ mod ast {
                         Expr::Lit(ExprLit { value: 3.into() }),
                     ],
                 })),
+            }))]
+        );
+    }
+
+    #[test]
+    fn test_literal_parse() {
+        let input = "const value = 42";
+        let scope = parse(input);
+        assert_eq!(
+            *scope,
+            vec![Stmt::Item(Item::Const(ItemConst {
+                name: "value".into(),
+                expr: Box::new(Expr::Lit(ExprLit { value: 42.into() })),
             }))]
         );
     }
