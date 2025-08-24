@@ -7,7 +7,7 @@ use wollok_lexer::{
 };
 
 use crate::{
-    expr::{Expr, ExprArray, ExprLit},
+    expr::{Expr, ExprArray, ExprLit, ExprSet},
     item::{Item, ItemConst, ItemLet, ItemObject, ItemProperty},
     source::Ast,
 };
@@ -85,6 +85,64 @@ impl Ast<'_> {
         }
     }
 
+    fn parse_set(&mut self, ident: usize) -> Expr {
+        debug!("Parsing set expression");
+        let mut elements = Vec::new();
+
+        _ = self.expect_token(&T!(OpenBrace));
+
+        if let Some(token) = self.peek()
+            && matches!(**token, T!(CloseBrace))
+        {
+            _ = token.accept();
+            debug!("Parsed empty set");
+            return Expr::Set(ExprSet { elements });
+        }
+
+        // Parse set elements
+        loop {
+            // Parse the next expression
+            let expr = self.parse_expr(ident);
+            elements.push(expr);
+
+            // Check what follows the expression
+            if let Some(token) = self.peek() {
+                match **token {
+                    T![Comma] => {
+                        // Consume comma and continue to next element
+                        _ = token.accept();
+
+                        // Check for trailing comma before closing brace
+                        if let Some(next_token) = self.peek()
+                            && matches!(**next_token, T!(CloseBrace))
+                        {
+                            break;
+                        }
+                    }
+                    T![CloseBrace] => {
+                        // End of set
+                        break;
+                    }
+                    _ => {
+                        // Unexpected token - report error (this will panic)
+                        let unexpected = token.accept();
+                        self.error_at(
+                            unexpected.span,
+                            format!("Expected ',' or ']', found {:?}", unexpected.token),
+                        );
+                    }
+                }
+            } else {
+                // Unexpected end of input (this will panic)
+                self.error_in_place("Unexpected end of input while parsing array");
+            }
+        }
+
+        self.expect_token(&T!(CloseBrace));
+        debug!("Parsed set with {} elements", elements.len());
+        Expr::Set(ExprSet { elements })
+    }
+
     fn parse_array(&mut self, ident: usize) -> Expr {
         debug!("Parsing array expression");
         let mut elements = Vec::new();
@@ -148,6 +206,7 @@ impl Ast<'_> {
         match *primitive {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(ident),
+            T!(Hash) => self.parse_set(ident),
             _ => self.error_in_place("Expected expression"),
         }
     }
