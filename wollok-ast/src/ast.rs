@@ -2,13 +2,13 @@ use tracing::{debug, info, trace, warn};
 
 use wollok_lexer::{
     lexer::TokenStream,
-    macros::{T, kw},
+    macros::{T, cmt, kw},
     token::Token,
 };
 
 use crate::{
     expr::{Expr, ExprArray, ExprLit, ExprSet},
-    item::{Item, ItemConst, ItemLet, ItemObject, ItemProperty},
+    item::{Ident, Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
     source::Ast,
 };
 
@@ -103,6 +103,7 @@ impl Ast<'_> {
         // this is the other side of the =
         let primitive = self.expect();
         trace!("Parsing expression starting with token: {:?}", *primitive);
+        self.skip_comments();
         match *primitive {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
@@ -112,6 +113,7 @@ impl Ast<'_> {
     }
 
     fn parse_item(&mut self) -> Item {
+        self.skip_comments();
         let item = self.expect();
         debug!("Parsing item: {:?}", *item);
         match *item {
@@ -140,13 +142,58 @@ impl Ast<'_> {
                 Item::Property(ItemProperty { name, expr })
             }
             kw!(Method) => {
-                warn!("Method parsing not yet implemented");
-                todo!()
+                trace!("Parsing method declaration");
+                let signature = self.parse_method_signature();
+                let token = self.peek_expect();
+                if matches!(**token, T!(OpenBrace)) {
+                    let body = Box::new(self.parse_block());
+                    return Item::Method(ItemMethod { signature, body });
+                } else if matches!(**token, T!(Equals)) {
+                    _ = token.accept();
+                    let body = Box::new(self.parse_expr());
+                    return Item::Method(ItemMethod { signature, body });
+                }
+                self.error_in_place("Expected '{' or '=' after method signature");
             }
             _ => {
                 warn!("Unexpected token in item parsing: {:?}", *item);
                 self.error_in_place(format!("Unexpected token in item parsing: {:?}", *item))
             }
+        }
+    }
+
+    fn parse_block(&mut self) -> Expr {
+        todo!("Implement block parsing")
+    }
+
+    fn parse_method_signature(&mut self) -> Signature {
+        let mut params = Vec::new();
+
+        let name = self.expect_match("Expected method identifier", |t| t.into_ident());
+        self.expect_token(&T!(OpenParen));
+        loop {
+            let Some(token) = self.peek() else {
+                self.error_in_place("Unexpected end of input in method signature");
+            };
+
+            match **token {
+                T!(CloseParen) => break, // End of parameters
+                T!(Comma) => {
+                    _ = token.accept(); // Consume comma and continue
+                }
+                _ => {
+                    let param_name =
+                        self.expect_match("Expected parameter name", |t| t.into_ident());
+                    params.push(Ident { name: param_name });
+                }
+            }
+        }
+
+        self.expect_token(&T!(CloseParen));
+
+        Signature {
+            ident: name,
+            params,
         }
     }
 
@@ -196,13 +243,27 @@ impl Ast<'_> {
         body
     }
 
+    fn skip_comments(&mut self) {
+        while let Some(token) = self.peek() {
+            if matches!(**token, cmt!(@match _)) {
+                trace!("skipping comment");
+                _ = token.accept();
+            } else {
+                token.recover();
+                break;
+            }
+        }
+    }
+
     fn parse_object(&mut self) -> Stmt {
         trace!("Starting object parsing");
         let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
         debug!("Parsing object '{}'", name);
         self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
+        self.skip_comments();
         let body = self.parse_object_body();
         self.expect_token(&T!(CloseBrace)); // Here we should expect the `}`
+        self.skip_comments();
         info!(
             "Successfully parsed object '{}' with {} items",
             name,

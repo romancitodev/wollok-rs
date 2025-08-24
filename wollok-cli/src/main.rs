@@ -22,17 +22,17 @@ fn main() {
     debug!("Debug information available");
 
     // Intentar leer y procesar un archivo de ejemplo
-    if let Ok(content) = fs::read_to_string("../test_example.wlk") {
+    if let Ok(content) = fs::read_to_string("../example.wlk") {
         info!("Processing test file");
 
         // Crear TokenStream y recolectar tokens
         let token_stream = wollok_lexer::lexer::TokenStream::new(&content);
-        if let Ok(tokens) = token_stream.collect_all() {
+        if token_stream.collect_all().is_ok() {
             info!("Lexing completed successfully");
 
             // Intentar parsear AST
             let token_stream = wollok_lexer::lexer::TokenStream::new(&content);
-            let scope = wollok_ast::ast::Scope::from_tokens("test_example.wlk", token_stream);
+            let _ = wollok_ast::ast::Scope::from_tokens("example.wlk", token_stream);
             info!("AST parsing completed");
         } else {
             info!("Lexing failed");

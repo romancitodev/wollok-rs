@@ -46,6 +46,9 @@ macro_rules! cmt {
     ($i:expr) => {
         $crate::token::Token::Comment($i.to_owned())
     };
+    (@match $i:tt) => {
+        $crate::token::Token::Comment($i)
+    };
 }
 
 #[doc(inline)]

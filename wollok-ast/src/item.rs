@@ -42,7 +42,6 @@ pub struct Ident {
 pub struct Signature {
     pub ident: String,
     pub params: Vec<Ident>,
-    pub output: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
