@@ -15,6 +15,14 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope(pub Vec<Stmt>);
 
+impl std::ops::Deref for Scope {
+    type Target = Vec<Stmt>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     Item(Item),
@@ -85,118 +93,18 @@ impl Ast<'_> {
         }
     }
 
-    fn parse_set(&mut self, ident: usize) -> Expr {
-        debug!("Parsing set expression");
-        let mut elements = Vec::new();
-
+    fn parse_set(&mut self, _ident: usize) -> Expr {
         _ = self.expect_token(&T!(OpenBrace));
 
-        if let Some(token) = self.peek()
-            && matches!(**token, T!(CloseBrace))
-        {
-            _ = token.accept();
-            debug!("Parsed empty set");
-            return Expr::Set(ExprSet { elements });
-        }
-
-        // Parse set elements
-        loop {
-            // Parse the next expression
-            let expr = self.parse_expr(ident);
-            elements.push(expr);
-
-            // Check what follows the expression
-            if let Some(token) = self.peek() {
-                match **token {
-                    T![Comma] => {
-                        // Consume comma and continue to next element
-                        _ = token.accept();
-
-                        // Check for trailing comma before closing brace
-                        if let Some(next_token) = self.peek()
-                            && matches!(**next_token, T!(CloseBrace))
-                        {
-                            break;
-                        }
-                    }
-                    T![CloseBrace] => {
-                        // End of set
-                        break;
-                    }
-                    _ => {
-                        // Unexpected token - report error (this will panic)
-                        let unexpected = token.accept();
-                        self.error_at(
-                            unexpected.span,
-                            format!("Expected ',' or ']', found {:?}", unexpected.token),
-                        );
-                    }
-                }
-            } else {
-                // Unexpected end of input (this will panic)
-                self.error_in_place("Unexpected end of input while parsing array");
-            }
-        }
-
-        self.expect_token(&T!(CloseBrace));
-        debug!("Parsed set with {} elements", elements.len());
-        Expr::Set(ExprSet { elements })
+        self.parse_collection("set", &T!(CloseBrace), |elements| {
+            Expr::Set(ExprSet { elements })
+        })
     }
 
-    fn parse_array(&mut self, ident: usize) -> Expr {
-        debug!("Parsing array expression");
-        let mut elements = Vec::new();
-
-        if let Some(token) = self.peek()
-            && matches!(**token, T!(CloseSquareBracket))
-        {
-            _ = token.accept();
-            debug!("Parsed empty array");
-            return Expr::Array(ExprArray { elements });
-        }
-
-        // Parse array elements
-        loop {
-            // Parse the next expression
-            let expr = self.parse_expr(ident);
-            elements.push(expr);
-
-            // Check what follows the expression
-            if let Some(token) = self.peek() {
-                match **token {
-                    T![Comma] => {
-                        // Consume comma and continue to next element
-                        _ = token.accept();
-
-                        // Check for trailing comma before closing bracket
-                        if let Some(next_token) = self.peek()
-                            && matches!(**next_token, T!(CloseSquareBracket))
-                        {
-                            break;
-                        }
-                    }
-                    T![CloseSquareBracket] => {
-                        // End of array
-                        break;
-                    }
-                    _ => {
-                        // Unexpected token - report error (this will panic)
-                        let unexpected = token.accept();
-                        self.error_at(
-                            unexpected.span,
-                            format!("Expected ',' or ']', found {:?}", unexpected.token),
-                        );
-                    }
-                }
-            } else {
-                // Unexpected end of input (this will panic)
-                self.error_in_place("Unexpected end of input while parsing array");
-            }
-        }
-
-        self.expect_token(&T!(CloseSquareBracket));
-        debug!("Parsed array with {} elements", elements.len());
-        Expr::Array(ExprArray { elements })
+    fn parse_array(&mut self, _ident: usize) -> Expr {
+        self.parse_collection("array", &T!(CloseSquareBracket), |elements| {
+            Expr::Array(ExprArray { elements })
+        })
     }
 
     fn parse_expr(&mut self, ident: usize) -> Expr {
@@ -245,7 +153,7 @@ impl Ast<'_> {
             }
             _ => {
                 warn!("Unexpected token in item parsing: {:?}", *item);
-                self.error_in_place("error")
+                self.error_in_place(format!("Unexpected token in item parsing: {:?}", *item))
             }
         }
     }
@@ -260,6 +168,10 @@ impl Ast<'_> {
             wollok_lexer::token::Token::Punctuation(_) => todo!(),
             wollok_lexer::token::Token::Literal(_) => todo!(),
             kw!(Object) => self.parse_object(ident),
+            kw!(Let) | kw!(Const) => {
+                token.recover();
+                Stmt::Item(self.parse_item(ident))
+            }
             wollok_lexer::token::Token::Keyword(_) => todo!(),
         }
     }
@@ -332,5 +244,107 @@ impl Ast<'_> {
         // For the moment, we just do:
         // INFO: But, maybe in a future we might use `match stmt` and then classify the stmt.
         nodes.push(stmt);
+    }
+
+    fn parse_element_expr(&mut self) -> Expr {
+        // Parse a single expression element (for arrays, sets, etc.)
+        let primitive = self.expect();
+        trace!(
+            "Parsing element expression starting with token: {:?}",
+            *primitive
+        );
+        match *primitive {
+            Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
+            T!(OpenSquareBracket) => self.parse_array(0), // Nested arrays
+            T!(Hash) => self.parse_set(0),                // Nested sets
+            _ => self.error_in_place("Expected element expression"),
+        }
+    }
+
+    fn parse_collection(
+        &mut self,
+        collection_name: &str,
+        close_token: &Token,
+        create_expr: impl Fn(Vec<Expr>) -> Expr,
+    ) -> Expr {
+        debug!("Parsing {} expression", collection_name);
+        let mut elements = Vec::new();
+
+        if let Some(token) = self.peek() {
+            if **token == *close_token {
+                _ = token.accept();
+                debug!("Parsed empty {}", collection_name);
+                return create_expr(elements);
+            }
+            // Not empty, put the token back
+            token.recover();
+        }
+
+        // Parse collection elements
+        loop {
+            // Parse the next expression (element inside the collection)
+            debug!("About to parse {} element", collection_name);
+            let element_expr = self.parse_element_expr();
+            elements.push(element_expr);
+            debug!(
+                "Parsed {} element, now checking what follows",
+                collection_name
+            );
+
+            // Check what follows the expression
+            if let Some(token) = self.peek() {
+                debug!("Found token after element: {:?}", **token);
+                match **token {
+                    ref t if *t == T!(Comma) => {
+                        // Consume comma and continue to next element
+                        debug!("Found comma, consuming it");
+                        _ = token.accept();
+
+                        // Check for trailing comma before closing delimiter
+                        if let Some(next_token) = self.peek() {
+                            debug!("After comma, next token is: {:?}", **next_token);
+                            if **next_token == *close_token {
+                                debug!("Found trailing comma before closing delimiter, breaking");
+                                next_token.recover();
+                                break;
+                            }
+                            debug!("After comma, continuing to next element");
+                            next_token.recover();
+                        } else {
+                            debug!("No token after comma - unexpected end");
+                        }
+                    }
+                    ref t if *t == *close_token => {
+                        // End of collection - put the token back so expect_token can consume it
+                        token.recover();
+                        break;
+                    }
+                    _ => {
+                        // Unexpected token - report error (this will panic)
+                        let unexpected = token.accept();
+                        self.error_at(
+                            unexpected.span,
+                            format!(
+                                "Expected ',' or closing delimiter, found {:?}",
+                                unexpected.token
+                            ),
+                        );
+                    }
+                }
+            } else {
+                // Unexpected end of input (this will panic)
+                self.error_in_place(format!(
+                    "Unexpected end of input while parsing {collection_name}"
+                ));
+            }
+        }
+
+        self.expect_token(close_token);
+        debug!(
+            "Parsed {} with {} elements",
+            collection_name,
+            elements.len()
+        );
+        create_expr(elements)
     }
 }
