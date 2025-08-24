@@ -12,3 +12,6 @@ test package:
 
 run filter="trace":
   with-env { RUST_LOG: "wollok={{filter}}" } { cargo run }
+
+run-release filter="info":
+  with-env { RUST_LOG: "wollok={{filter}}" } { cargo run --release }

@@ -7,7 +7,7 @@ use wollok_lexer::{
 };
 
 use crate::{
-    expr::{Expr, ExprArray, ExprLit, ExprSet},
+    expr::{Block, Expr, ExprArray, ExprField, ExprLit, ExprSet},
     item::{Ident, Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
     source::Ast,
 };
@@ -105,6 +105,10 @@ impl Ast<'_> {
         trace!("Parsing expression starting with token: {:?}", *primitive);
         self.skip_comments();
         match *primitive {
+            Token::Ident(ref ident) => Expr::Field(ExprField {
+                name: ident.clone(),
+                base: Box::new(Expr::Self_),
+            }),
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),
@@ -146,11 +150,13 @@ impl Ast<'_> {
                 let signature = self.parse_method_signature();
                 let token = self.peek_expect();
                 if matches!(**token, T!(OpenBrace)) {
-                    let body = Box::new(self.parse_block());
+                    self.parse_pre_statement();
+                    let body = self.parse_block();
+                    self.expect_token(&T!(CloseBrace));
                     return Item::Method(ItemMethod { signature, body });
                 } else if matches!(**token, T!(Equals)) {
                     _ = token.accept();
-                    let body = Box::new(self.parse_expr());
+                    let body = self.parse_inline_block();
                     return Item::Method(ItemMethod { signature, body });
                 }
                 self.error_in_place("Expected '{' or '=' after method signature");
@@ -162,8 +168,31 @@ impl Ast<'_> {
         }
     }
 
-    fn parse_block(&mut self) -> Expr {
-        todo!("Implement block parsing")
+    fn parse_inline_block(&mut self) -> Block {
+        trace!("Parsing block");
+        let mut stmts = Vec::new();
+        while let Some(token) = self.peek() {
+            match **token {
+                T!(Newline) => {
+                    trace!("Finished parsing inline block");
+                    token.recover();
+                    break;
+                }
+                _ => {
+                    token.recover();
+                    let stmt = self.parse_expr();
+                    trace!("Parsed statement: {:?}", stmt);
+                    stmts.push(stmt);
+                }
+            }
+        }
+
+        Block { stmts }
+    }
+
+    fn parse_block(&mut self) -> Block {
+        trace!("Parsing block");
+        todo!();
     }
 
     fn parse_method_signature(&mut self) -> Signature {
@@ -176,20 +205,43 @@ impl Ast<'_> {
                 self.error_in_place("Unexpected end of input in method signature");
             };
 
-            match **token {
-                T!(CloseParen) => break, // End of parameters
+            let (span, parsed) = token.split();
+
+            trace!("Parsed token in method signature: {:?}", parsed);
+            match parsed {
+                T!(CloseParen) => {
+                    token.recover();
+                    break;
+                } // End of parameters
                 T!(Comma) => {
                     _ = token.accept(); // Consume comma and continue
                 }
-                _ => {
-                    let param_name =
-                        self.expect_match("Expected parameter name", |t| t.into_ident());
+                Token::Ident(ref ident) => {
+                    let param_name = ident.clone();
+                    trace!("Parsed parameter: {:?}", param_name);
                     params.push(Ident { name: param_name });
+                }
+                _ => {
+                    self.error_at(
+                        span,
+                        format!("Unexpected token in method signature: {parsed:?}"),
+                    );
+                    // trace!("Parsed parameter: {:?}", param_name);
                 }
             }
         }
 
         self.expect_token(&T!(CloseParen));
+
+        trace!(
+            "Parsed method signature: {}({})",
+            name,
+            params
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
 
         Signature {
             ident: name,
@@ -200,18 +252,21 @@ impl Ast<'_> {
     fn parse_statement(&mut self) -> Stmt {
         let token = self.peek_expect();
         match **token {
-            wollok_lexer::token::Token::Comment(_) => {
-                unreachable!("Comments should be handled in parse_pre_statement")
-            }
-            wollok_lexer::token::Token::Ident(_) => todo!(),
-            wollok_lexer::token::Token::Punctuation(_) => todo!(),
-            wollok_lexer::token::Token::Literal(_) => todo!(),
+            // wollok_lexer::token::Token::Comment(_) => {
+            //     unreachable!("Comments should be handled in parse_pre_statement")
+            // }
+            // wollok_lexer::token::Token::Ident(_) => todo!(),
+            // wollok_lexer::token::Token::Punctuation(_) => todo!(),
+            // wollok_lexer::token::Token::Literal(_) => todo!(),
             kw!(Object) => self.parse_object(),
             Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
                 token.recover();
                 Stmt::Item(self.parse_item())
             }
-            wollok_lexer::token::Token::Keyword(_) => todo!(),
+            _ => {
+                warn!("Unexpected token in statement: {:?}", **token);
+                self.error_in_place("Unexpected token in statement");
+            } // wollok_lexer::token::Token::Keyword(_) => todo!(),
         }
     }
 

@@ -1,4 +1,4 @@
-use crate::expr::Expr;
+use crate::expr::{Block, Expr};
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -47,7 +47,7 @@ pub struct Signature {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemMethod {
     pub signature: Signature,
-    pub body: Box<Expr>,
+    pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
