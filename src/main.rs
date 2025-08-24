@@ -6,9 +6,7 @@ use wollok_lexer::lexer::TokenStream;
 fn init_tracing() {
     // Configurar tracing simple a stdout
     tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env().add_directive("wollok=debug".parse().unwrap()),
-        )
+        .with_env_filter(EnvFilter::from_default_env())
         .with_target(true)
         .with_thread_ids(false)
         .with_file(false)
