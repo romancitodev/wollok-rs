@@ -131,6 +131,7 @@ pub enum Punctuation {
     Colon,
     Dot,
     Dollar,
+    Hash,
 
     // Operators
     Plus,
@@ -171,6 +172,7 @@ impl fmt::Display for Punctuation {
             Punctuation::Colon => ":",
             Punctuation::Dot => ".",
             Punctuation::Dollar => "$",
+            Punctuation::Hash => "#",
 
             Punctuation::Plus => "+",
             Punctuation::Minus => "-",

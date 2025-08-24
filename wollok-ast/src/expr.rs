@@ -10,6 +10,7 @@ pub struct Block {
 #[non_exhaustive]
 pub enum Expr {
     Array(ExprArray),
+    Set(ExprSet),
     Assign(ExprAssign),
     Binary(ExprBinary),
     // Block(ExprBlock),
@@ -42,6 +43,11 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprArray {
+    pub elements: Vec<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExprSet {
     pub elements: Vec<Expr>,
 }
 

@@ -33,6 +33,7 @@ impl TokenParser for PunctuationParser {
             ":".value(Punctuation::Colon),
             ".".value(Punctuation::Dot),
             "$".value(Punctuation::Dollar),
+            "#".value(Punctuation::Hash),
             // Delimitadores
             "{".value(Punctuation::OpenBrace),
             "}".value(Punctuation::CloseBrace),

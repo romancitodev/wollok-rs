@@ -55,28 +55,29 @@ impl Ast<'_> {
     }
 
     fn parse_pre_statement(&mut self, ident: usize) -> bool {
-        let Some(first) = self.peek() else {
-            return false;
-        };
-
-        if *first != T![Newline] {
-            first.recover();
-            return true;
-        }
-
         loop {
-            if ident != 0 {
-                match self.eat_ident(ident) {
-                    Some(false) => {}
-                    Some(true) => continue,
-                    None => return false,
+            let Some(first) = self.peek() else {
+                return false;
+            };
+
+            match **first {
+                T![Newline] => {
+                    _ = first.accept();
+
+                    if ident != 0 {
+                        match self.eat_ident(ident) {
+                            Some(false) => return true,
+                            Some(true) => {}
+                            None => return false,
+                        }
+                    }
                 }
-
-                let Some(first) = self.peek() else {
-                    return false;
-                };
-
-                if *first != T![Newline] {
+                wollok_lexer::token::Token::Comment(_) => {
+                    // Consume and ignore comment tokens
+                    _ = first.accept();
+                    trace!("Skipped comment token in pre-statement");
+                }
+                _ => {
                     first.recover();
                     return true;
                 }
@@ -84,18 +85,69 @@ impl Ast<'_> {
         }
     }
 
+    fn parse_array(&mut self, ident: usize) -> Expr {
+        debug!("Parsing array expression");
+        let mut elements = Vec::new();
+
+        if let Some(token) = self.peek()
+            && matches!(**token, T!(CloseSquareBracket))
+        {
+            _ = token.accept();
+            debug!("Parsed empty array");
+            return Expr::Array(ExprArray { elements });
+        }
+
+        // Parse array elements
+        loop {
+            // Parse the next expression
+            let expr = self.parse_expr(ident);
+            elements.push(expr);
+
+            // Check what follows the expression
+            if let Some(token) = self.peek() {
+                match **token {
+                    T![Comma] => {
+                        // Consume comma and continue to next element
+                        _ = token.accept();
+
+                        // Check for trailing comma before closing bracket
+                        if let Some(next_token) = self.peek()
+                            && matches!(**next_token, T!(CloseSquareBracket))
+                        {
+                            break;
+                        }
+                    }
+                    T![CloseSquareBracket] => {
+                        // End of array
+                        break;
+                    }
+                    _ => {
+                        // Unexpected token - report error (this will panic)
+                        let unexpected = token.accept();
+                        self.error_at(
+                            unexpected.span,
+                            format!("Expected ',' or ']', found {:?}", unexpected.token),
+                        );
+                    }
+                }
+            } else {
+                // Unexpected end of input (this will panic)
+                self.error_in_place("Unexpected end of input while parsing array");
+            }
+        }
+
+        self.expect_token(&T!(CloseSquareBracket));
+        debug!("Parsed array with {} elements", elements.len());
+        Expr::Array(ExprArray { elements })
+    }
+
     fn parse_expr(&mut self, ident: usize) -> Expr {
         // this is the other side of the =
         let primitive = self.expect();
+        trace!("Parsing expression starting with token: {:?}", *primitive);
         match *primitive {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
-            T!(OpenParen) => {
-                let expr = self.parse_expr(ident);
-                self.expect_token(&T!(CloseParen));
-                Expr::Array(ExprArray {
-                    elements: vec![expr],
-                })
-            }
+            T!(OpenSquareBracket) => self.parse_array(ident),
             _ => self.error_in_place("Expected expression"),
         }
     }
@@ -142,7 +194,9 @@ impl Ast<'_> {
     fn parse_statement(&mut self, ident: usize) -> Stmt {
         let token = self.peek_expect();
         match **token {
-            wollok_lexer::token::Token::Comment(_) => todo!(),
+            wollok_lexer::token::Token::Comment(_) => {
+                unreachable!("Comments should be handled in parse_pre_statement")
+            }
             wollok_lexer::token::Token::Ident(_) => todo!(),
             wollok_lexer::token::Token::Punctuation(_) => todo!(),
             wollok_lexer::token::Token::Literal(_) => todo!(),
@@ -160,6 +214,8 @@ impl Ast<'_> {
             };
 
             if *first == T![Newline] {
+                // Consume the newline token and continue
+                _ = first.accept();
                 continue;
             }
 
@@ -198,7 +254,10 @@ impl Ast<'_> {
             let token = self.peek()?;
 
             match **token {
-                T![Identation] => {}
+                T![Identation] => {
+                    // Consume the indentation token
+                    _ = token.accept();
+                }
                 T![Newline] => return Some(true),
                 _ => {
                     token.recover();
