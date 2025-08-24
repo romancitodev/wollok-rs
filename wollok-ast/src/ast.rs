@@ -33,7 +33,7 @@ impl Scope {
     #[must_use]
     pub fn from_tokens(base: &str, tokens: TokenStream<'_>) -> Self {
         info!("Starting AST parsing from tokens for base: {}", base);
-        let result = Ast::new(base, tokens).parse_scope(0);
+        let result = Ast::new(base, tokens).parse_scope();
         info!(
             "Successfully parsed AST scope with {} statements",
             result.0.len()
@@ -43,18 +43,18 @@ impl Scope {
 }
 
 impl Ast<'_> {
-    pub(crate) fn parse_scope(&mut self, ident: usize) -> Scope {
-        debug!("Parsing scope at indentation level: {}", ident);
+    pub(crate) fn parse_scope(&mut self) -> Scope {
+        debug!("Parsing scope");
         let mut nodes = vec![];
 
         loop {
-            if !self.parse_pre_statement(ident) {
+            if !self.parse_pre_statement() {
                 trace!("No more pre-statements to parse, ending scope");
                 break;
             }
 
             trace!("Parsing statement in scope");
-            let stmt = self.parse_statement(ident);
+            let stmt = self.parse_statement();
             Self::push_to_node(stmt, &mut nodes);
         }
 
@@ -62,7 +62,7 @@ impl Ast<'_> {
         Scope(nodes)
     }
 
-    fn parse_pre_statement(&mut self, ident: usize) -> bool {
+    fn parse_pre_statement(&mut self) -> bool {
         loop {
             let Some(first) = self.peek() else {
                 return false;
@@ -71,14 +71,6 @@ impl Ast<'_> {
             match **first {
                 T![Newline] => {
                     _ = first.accept();
-
-                    if ident != 0 {
-                        match self.eat_ident(ident) {
-                            Some(false) => return true,
-                            Some(true) => {}
-                            None => return false,
-                        }
-                    }
                 }
                 wollok_lexer::token::Token::Comment(_) => {
                     // Consume and ignore comment tokens
@@ -93,7 +85,7 @@ impl Ast<'_> {
         }
     }
 
-    fn parse_set(&mut self, _ident: usize) -> Expr {
+    fn parse_set(&mut self) -> Expr {
         _ = self.expect_token(&T!(OpenBrace));
 
         self.parse_collection("set", &T!(CloseBrace), |elements| {
@@ -101,25 +93,25 @@ impl Ast<'_> {
         })
     }
 
-    fn parse_array(&mut self, _ident: usize) -> Expr {
+    fn parse_array(&mut self) -> Expr {
         self.parse_collection("array", &T!(CloseSquareBracket), |elements| {
             Expr::Array(ExprArray { elements })
         })
     }
 
-    fn parse_expr(&mut self, ident: usize) -> Expr {
+    fn parse_expr(&mut self) -> Expr {
         // this is the other side of the =
         let primitive = self.expect();
         trace!("Parsing expression starting with token: {:?}", *primitive);
         match *primitive {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
-            T!(OpenSquareBracket) => self.parse_array(ident),
-            T!(Hash) => self.parse_set(ident),
+            T!(OpenSquareBracket) => self.parse_array(),
+            T!(Hash) => self.parse_set(),
             _ => self.error_in_place("Expected expression"),
         }
     }
 
-    fn parse_item(&mut self, ident: usize) -> Item {
+    fn parse_item(&mut self) -> Item {
         let item = self.expect();
         debug!("Parsing item: {:?}", *item);
         match *item {
@@ -127,7 +119,7 @@ impl Ast<'_> {
                 trace!("Parsing const declaration");
                 let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
                 self.expect_token(&T!(Equals));
-                let expr = Box::new(self.parse_expr(ident));
+                let expr = Box::new(self.parse_expr());
                 debug!("Parsed const '{}' with expression", name);
                 Item::Const(ItemConst { name, expr })
             }
@@ -135,7 +127,7 @@ impl Ast<'_> {
                 trace!("Parsing let declaration");
                 let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
                 self.expect_token(&T!(Equals));
-                let expr = Box::new(self.parse_expr(ident));
+                let expr = Box::new(self.parse_expr());
                 debug!("Parsed let '{}' with expression", name);
                 Item::Let(ItemLet { name, expr })
             }
@@ -143,7 +135,7 @@ impl Ast<'_> {
                 trace!("Parsing property declaration");
                 let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
                 self.expect_token(&T!(Equals));
-                let expr = Box::new(self.parse_expr(ident));
+                let expr = Box::new(self.parse_expr());
                 debug!("Parsed property '{}' with expression", name);
                 Item::Property(ItemProperty { name, expr })
             }
@@ -158,7 +150,7 @@ impl Ast<'_> {
         }
     }
 
-    fn parse_statement(&mut self, ident: usize) -> Stmt {
+    fn parse_statement(&mut self) -> Stmt {
         let token = self.peek_expect();
         match **token {
             wollok_lexer::token::Token::Comment(_) => {
@@ -167,16 +159,16 @@ impl Ast<'_> {
             wollok_lexer::token::Token::Ident(_) => todo!(),
             wollok_lexer::token::Token::Punctuation(_) => todo!(),
             wollok_lexer::token::Token::Literal(_) => todo!(),
-            kw!(Object) => self.parse_object(ident),
-            kw!(Let) | kw!(Const) => {
+            kw!(Object) => self.parse_object(),
+            Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
                 token.recover();
-                Stmt::Item(self.parse_item(ident))
+                Stmt::Item(self.parse_item())
             }
             wollok_lexer::token::Token::Keyword(_) => todo!(),
         }
     }
 
-    fn parse_object_body(&mut self, ident: usize) -> Vec<Item> {
+    fn parse_object_body(&mut self) -> Vec<Item> {
         let mut body = Vec::new();
 
         loop {
@@ -197,19 +189,19 @@ impl Ast<'_> {
 
             first.recover();
 
-            let stmt = self.parse_item(ident);
+            let stmt = self.parse_item();
             Self::push_to_node(stmt, &mut body);
         }
 
         body
     }
 
-    fn parse_object(&mut self, ident: usize) -> Stmt {
+    fn parse_object(&mut self) -> Stmt {
         trace!("Starting object parsing");
         let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
         debug!("Parsing object '{}'", name);
         self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
-        let body = self.parse_object_body(ident + 1);
+        let body = self.parse_object_body();
         self.expect_token(&T!(CloseBrace)); // Here we should expect the `}`
         info!(
             "Successfully parsed object '{}' with {} items",
@@ -218,26 +210,6 @@ impl Ast<'_> {
         );
 
         Stmt::Item(Item::Object(ItemObject { name, body }))
-    }
-
-    fn eat_ident(&mut self, ident: usize) -> Option<bool> {
-        for _ in 0..ident {
-            let token = self.peek()?;
-
-            match **token {
-                T![Identation] => {
-                    // Consume the indentation token
-                    _ = token.accept();
-                }
-                T![Newline] => return Some(true),
-                _ => {
-                    token.recover();
-                    return None;
-                }
-            }
-        }
-
-        Some(false)
     }
 
     fn push_to_node<T>(stmt: T, nodes: &mut Vec<T>) {
@@ -255,8 +227,8 @@ impl Ast<'_> {
         );
         match *primitive {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
-            T!(OpenSquareBracket) => self.parse_array(0), // Nested arrays
-            T!(Hash) => self.parse_set(0),                // Nested sets
+            T!(OpenSquareBracket) => self.parse_array(), // Nested arrays
+            T!(Hash) => self.parse_set(),                // Nested sets
             _ => self.error_in_place("Expected element expression"),
         }
     }
@@ -320,7 +292,6 @@ impl Ast<'_> {
                         break;
                     }
                     _ => {
-                        // Unexpected token - report error (this will panic)
                         let unexpected = token.accept();
                         self.error_at(
                             unexpected.span,

@@ -74,9 +74,6 @@ macro_rules! kw {
   ($i:ident) => {
     $crate::token::Token::Keyword(kw!(@raw $i))
   };
-  (@template $i:expr) => {
-    $crate::token::Token::Keyword($crate::token::Keyword::Template($i))
-  }
 }
 
 #[doc(inline)]
