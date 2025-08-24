@@ -143,12 +143,14 @@ pub enum Punctuation {
     BitAnd,
     BitOr,
 
-    Equals, // =
-    Eq,     // ==
-    Ne,     // !=
-    And,    // &&
-    Or,     // ||
-    Bang,   // !, used for negation
+    // =
+    Equals,
+    // ==
+    Eq,
+    Ne,   // !=
+    And,  // &&
+    Or,   // ||
+    Bang, // !, used for negation
 
     Arrow,
     Newline,

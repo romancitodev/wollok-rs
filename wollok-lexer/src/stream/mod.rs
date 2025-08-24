@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 
+use tracing::{debug, info, trace, warn};
+
 use crate::{
     error::{Result, Src},
     parsers::{
@@ -19,6 +21,14 @@ pub struct TokenStream<'t> {
 impl<'t> TokenStream<'t> {
     #[must_use]
     pub fn new(input: &'t str) -> Self {
+        debug!(
+            "Creating new TokenStream with input length: {}",
+            input.len()
+        );
+        trace!(
+            "Input preview: {:?}",
+            &input.chars().take(50).collect::<String>()
+        );
         Self {
             input: Src::new(input),
             finished: false,
@@ -28,15 +38,23 @@ impl<'t> TokenStream<'t> {
     /// Intenta parsear el siguiente token
     fn next_token(&mut self) -> Result<'t, Option<SpannedToken>> {
         if self.finished {
+            trace!("TokenStream already finished");
             return Ok(None);
         }
 
         if self.input.is_empty() {
+            debug!("Reached end of input, finishing TokenStream");
             self.finished = true;
             return Ok(None);
         }
 
+        trace!(
+            "Attempting to parse next token from: {:?}",
+            &self.input.to_string().chars().take(20).collect::<String>()
+        );
+
         if let Ok(None) = WhitespaceParser::parse(&mut self.input) {
+            trace!("Skipped whitespace, trying next token");
             return self.next_token();
         }
 
@@ -51,13 +69,21 @@ impl<'t> TokenStream<'t> {
         .parse_next(&mut self.input);
 
         match result {
-            Ok(Some(token)) => Ok(Some(token)),
+            Ok(Some(token)) => {
+                debug!("Successfully parsed token: {:?}", token);
+                Ok(Some(token))
+            }
             Ok(None) => {
                 // Ningún parser pudo manejar el input, esto es un error
+                warn!(
+                    "No parser could handle input starting with: {:?}",
+                    &self.input.to_string().chars().take(10).collect::<String>()
+                );
                 self.finished = true;
                 Err(crate::error::LexerErr::from_input(&self.input))
             }
             Err(e) => {
+                warn!("Parser error encountered: {:?}", e);
                 self.finished = true;
                 Err(e)
             }
@@ -69,12 +95,18 @@ impl<'t> TokenStream<'t> {
     /// # Errors
     /// Retorna un error si ocurre un error de lexer al parsear los tokens.
     pub fn collect_all(mut self) -> Result<'t, Vec<SpannedToken>> {
+        info!("Starting token collection for entire input");
         let mut tokens = Vec::new();
 
         while let Some(token) = self.next()? {
             tokens.push(token);
         }
 
+        info!("Successfully collected {} tokens", tokens.len());
+        debug!(
+            "Token types: {:?}",
+            tokens.iter().map(|t| &t.token).collect::<Vec<_>>()
+        );
         Ok(tokens)
     }
 

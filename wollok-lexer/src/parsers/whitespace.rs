@@ -10,7 +10,7 @@ pub struct WhitespaceParser;
 
 impl TokenParser for WhitespaceParser {
     fn parse<'t>(input: &mut Src<'t>) -> Result<'t, Option<SpannedToken>> {
-        _ = take_while(1.., |c: char| c == ' ' || c == '\t').parse_next(input)?;
+        _ = take_while(1.., |c: char| c == ' ' || c == '\r' || c == '\t').parse_next(input)?;
         Ok(None)
     }
 }

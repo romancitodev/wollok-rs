@@ -60,7 +60,7 @@ pub struct ItemClass {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemObject {
-    pub name: Option<String>, // Los objetos pueden ser anónimos
+    pub name: String,
     pub body: Vec<Item>,
 }
 

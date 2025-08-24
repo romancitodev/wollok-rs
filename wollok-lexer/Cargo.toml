@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 winnow = "0.7.12"
 ariadne.workspace = true
+tracing.workspace = true

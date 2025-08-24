@@ -26,6 +26,7 @@ pub enum Expr {
     // Loop(ExprLoop),
     // Match(ExprMatch),
     MethodCall(ExprMethodCall),
+    Object(ExprObject),
     Paren(ExprParen),
     // Path(ExprPath),
     Return(ExprReturn),
@@ -148,4 +149,10 @@ pub struct ExprSuper {
 pub struct ExprNew {
     pub class_name: String,
     pub args: Vec<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExprObject {
+    pub name: String,
+    pub fields: Vec<Expr>,
 }
