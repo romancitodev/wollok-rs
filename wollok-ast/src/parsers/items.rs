@@ -103,7 +103,6 @@ impl Ast<'_> {
                         span,
                         format!("Unexpected token in method signature: {parsed:?}"),
                     );
-                    // trace!("Parsed parameter: {:?}", param_name);
                 }
             }
         }

@@ -1,4 +1,4 @@
-object pepe { // hello
+object pingüino { // hello
 	let a = [1, 2, 3]
 	const elements = #{1, true, "hello"}
 	const me = 1
@@ -15,5 +15,7 @@ object pepe { // hello
 
 	}
 }
+
+const ñandú = [[]]
 
 // const libro = new Libro()
