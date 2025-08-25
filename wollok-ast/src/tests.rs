@@ -10,8 +10,8 @@ mod ast {
 
     use crate::{
         ast::{Scope, Stmt},
-        expr::{Expr, ExprArray, ExprLit},
-        item::{Item, ItemConst},
+        expr::{Block, Expr, ExprArray, ExprAssign, ExprField, ExprLit},
+        item::{Item, ItemConst, ItemLet, ItemMethod, ItemObject, Signature},
     };
 
     #[test]
@@ -42,6 +42,44 @@ mod ast {
             vec![Stmt::Item(Item::Const(ItemConst {
                 name: "value".into(),
                 expr: Box::new(Expr::Lit(ExprLit { value: 42.into() })),
+            }))]
+        );
+    }
+
+    #[test]
+    fn test_object_with_assignment_in_method() {
+        let input = r"object foo {
+  let a = 1
+  method do() {
+    a = 2
+  }
+}";
+        let scope = parse(input);
+        assert_eq!(
+            scope.0,
+            vec![Stmt::Item(Item::Object(ItemObject {
+                name: "foo".into(),
+                body: vec![
+                    Item::Let(ItemLet {
+                        name: "a".into(),
+                        expr: Box::new(Expr::Lit(ExprLit { value: 1.into() })),
+                    }),
+                    Item::Method(ItemMethod {
+                        signature: Signature {
+                            ident: "do".into(),
+                            params: vec![],
+                        },
+                        body: Block {
+                            stmts: vec![Expr::Assign(ExprAssign {
+                                left: Box::new(Expr::Field(ExprField {
+                                    name: "a".into(),
+                                    base: Box::new(Expr::Self_)
+                                })),
+                                right: Box::new(Expr::Lit(ExprLit { value: 2.into() }))
+                            })],
+                        }
+                    }),
+                ],
             }))]
         );
     }

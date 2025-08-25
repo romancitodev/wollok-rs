@@ -1,16 +1,11 @@
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
 
 use wollok_lexer::{
     lexer::TokenStream,
-    macros::{T, cmt, kw},
-    token::Token,
+    macros::{T, cmt},
 };
 
-use crate::{
-    expr::{Block, Expr, ExprArray, ExprField, ExprLit, ExprSet},
-    item::{Ident, Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
-    source::Ast,
-};
+use crate::{expr::Expr, item::Item, source::Ast};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope(pub Vec<Stmt>);
@@ -43,6 +38,7 @@ impl Scope {
 }
 
 impl Ast<'_> {
+    /// Parses the entire scope (top-level statements and declarations)
     pub(crate) fn parse_scope(&mut self) -> Scope {
         debug!("Parsing scope");
         let mut nodes = vec![];
@@ -62,7 +58,9 @@ impl Ast<'_> {
         Scope(nodes)
     }
 
-    fn parse_pre_statement(&mut self) -> bool {
+    /// Handles pre-statement parsing (newlines, comments, etc.)
+    /// Returns false when no more tokens are available
+    pub(crate) fn parse_pre_statement(&mut self) -> bool {
         loop {
             let Some(first) = self.peek() else {
                 return false;
@@ -85,220 +83,8 @@ impl Ast<'_> {
         }
     }
 
-    fn parse_set(&mut self) -> Expr {
-        _ = self.expect_token(&T!(OpenBrace));
-
-        self.parse_collection("set", &T!(CloseBrace), |elements| {
-            Expr::Set(ExprSet { elements })
-        })
-    }
-
-    fn parse_array(&mut self) -> Expr {
-        self.parse_collection("array", &T!(CloseSquareBracket), |elements| {
-            Expr::Array(ExprArray { elements })
-        })
-    }
-
-    fn parse_expr(&mut self) -> Expr {
-        // this is the other side of the =
-        let primitive = self.expect();
-        trace!("Parsing expression starting with token: {:?}", *primitive);
-        self.skip_comments();
-        match *primitive {
-            Token::Ident(ref ident) => Expr::Field(ExprField {
-                name: ident.clone(),
-                base: Box::new(Expr::Self_),
-            }),
-            Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
-            T!(OpenSquareBracket) => self.parse_array(),
-            T!(Hash) => self.parse_set(),
-            _ => self.error_in_place("Expected expression"),
-        }
-    }
-
-    fn parse_item(&mut self) -> Item {
-        self.skip_comments();
-        let item = self.expect();
-        debug!("Parsing item: {:?}", *item);
-        match *item {
-            kw!(Const) => {
-                trace!("Parsing const declaration");
-                let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
-                self.expect_token(&T!(Equals));
-                let expr = Box::new(self.parse_expr());
-                debug!("Parsed const '{}' with expression", name);
-                Item::Const(ItemConst { name, expr })
-            }
-            kw!(Let) => {
-                trace!("Parsing let declaration");
-                let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
-                self.expect_token(&T!(Equals));
-                let expr = Box::new(self.parse_expr());
-                debug!("Parsed let '{}' with expression", name);
-                Item::Let(ItemLet { name, expr })
-            }
-            kw!(Property) => {
-                trace!("Parsing property declaration");
-                let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
-                self.expect_token(&T!(Equals));
-                let expr = Box::new(self.parse_expr());
-                debug!("Parsed property '{}' with expression", name);
-                Item::Property(ItemProperty { name, expr })
-            }
-            kw!(Method) => {
-                trace!("Parsing method declaration");
-                let signature = self.parse_method_signature();
-                let token = self.peek_expect();
-                if matches!(**token, T!(OpenBrace)) {
-                    self.parse_pre_statement();
-                    let body = self.parse_block();
-                    self.expect_token(&T!(CloseBrace));
-                    return Item::Method(ItemMethod { signature, body });
-                } else if matches!(**token, T!(Equals)) {
-                    _ = token.accept();
-                    let body = self.parse_inline_block();
-                    return Item::Method(ItemMethod { signature, body });
-                }
-                self.error_in_place("Expected '{' or '=' after method signature");
-            }
-            _ => {
-                warn!("Unexpected token in item parsing: {:?}", *item);
-                self.error_in_place(format!("Unexpected token in item parsing: {:?}", *item))
-            }
-        }
-    }
-
-    fn parse_inline_block(&mut self) -> Block {
-        trace!("Parsing block");
-        let mut stmts = Vec::new();
-        while let Some(token) = self.peek() {
-            match **token {
-                T!(Newline) => {
-                    trace!("Finished parsing inline block");
-                    token.recover();
-                    break;
-                }
-                _ => {
-                    token.recover();
-                    let stmt = self.parse_expr();
-                    trace!("Parsed statement: {:?}", stmt);
-                    stmts.push(stmt);
-                }
-            }
-        }
-
-        Block { stmts }
-    }
-
-    fn parse_block(&mut self) -> Block {
-        trace!("Parsing block");
-        todo!();
-    }
-
-    fn parse_method_signature(&mut self) -> Signature {
-        let mut params = Vec::new();
-
-        let name = self.expect_match("Expected method identifier", |t| t.into_ident());
-        self.expect_token(&T!(OpenParen));
-        loop {
-            let Some(token) = self.peek() else {
-                self.error_in_place("Unexpected end of input in method signature");
-            };
-
-            let (span, parsed) = token.split();
-
-            trace!("Parsed token in method signature: {:?}", parsed);
-            match parsed {
-                T!(CloseParen) => {
-                    token.recover();
-                    break;
-                } // End of parameters
-                T!(Comma) => {
-                    _ = token.accept(); // Consume comma and continue
-                }
-                Token::Ident(ref ident) => {
-                    let param_name = ident.clone();
-                    trace!("Parsed parameter: {:?}", param_name);
-                    params.push(Ident { name: param_name });
-                }
-                _ => {
-                    self.error_at(
-                        span,
-                        format!("Unexpected token in method signature: {parsed:?}"),
-                    );
-                    // trace!("Parsed parameter: {:?}", param_name);
-                }
-            }
-        }
-
-        self.expect_token(&T!(CloseParen));
-
-        trace!(
-            "Parsed method signature: {}({})",
-            name,
-            params
-                .iter()
-                .map(|p| p.name.as_str())
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-
-        Signature {
-            ident: name,
-            params,
-        }
-    }
-
-    fn parse_statement(&mut self) -> Stmt {
-        let token = self.peek_expect();
-        match **token {
-            // wollok_lexer::token::Token::Comment(_) => {
-            //     unreachable!("Comments should be handled in parse_pre_statement")
-            // }
-            // wollok_lexer::token::Token::Ident(_) => todo!(),
-            // wollok_lexer::token::Token::Punctuation(_) => todo!(),
-            // wollok_lexer::token::Token::Literal(_) => todo!(),
-            kw!(Object) => self.parse_object(),
-            Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
-                token.recover();
-                Stmt::Item(self.parse_item())
-            }
-            _ => {
-                warn!("Unexpected token in statement: {:?}", **token);
-                self.error_in_place("Unexpected token in statement");
-            } // wollok_lexer::token::Token::Keyword(_) => todo!(),
-        }
-    }
-
-    fn parse_object_body(&mut self) -> Vec<Item> {
-        let mut body = Vec::new();
-
-        loop {
-            let Some(first) = self.peek() else {
-                break;
-            };
-
-            if *first == T![Newline] {
-                // Consume the newline token and continue
-                _ = first.accept();
-                continue;
-            }
-
-            if *first == T![CloseBrace] {
-                first.recover();
-                break;
-            }
-
-            first.recover();
-
-            let stmt = self.parse_item();
-            Self::push_to_node(stmt, &mut body);
-        }
-
-        body
-    }
-
-    fn skip_comments(&mut self) {
+    /// Skips comment tokens in the token stream
+    pub(crate) fn skip_comments(&mut self) {
         while let Some(token) = self.peek() {
             if matches!(**token, cmt!(@match _)) {
                 trace!("skipping comment");
@@ -310,128 +96,7 @@ impl Ast<'_> {
         }
     }
 
-    fn parse_object(&mut self) -> Stmt {
-        trace!("Starting object parsing");
-        let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
-        debug!("Parsing object '{}'", name);
-        self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
-        self.skip_comments();
-        let body = self.parse_object_body();
-        self.expect_token(&T!(CloseBrace)); // Here we should expect the `}`
-        self.skip_comments();
-        info!(
-            "Successfully parsed object '{}' with {} items",
-            name,
-            body.len()
-        );
-
-        Stmt::Item(Item::Object(ItemObject { name, body }))
-    }
-
-    fn push_to_node<T>(stmt: T, nodes: &mut Vec<T>) {
-        // For the moment, we just do:
-        // INFO: But, maybe in a future we might use `match stmt` and then classify the stmt.
+    pub(crate) fn push_to_node<T>(stmt: T, nodes: &mut Vec<T>) {
         nodes.push(stmt);
-    }
-
-    fn parse_element_expr(&mut self) -> Expr {
-        // Parse a single expression element (for arrays, sets, etc.)
-        let primitive = self.expect();
-        trace!(
-            "Parsing element expression starting with token: {:?}",
-            *primitive
-        );
-        match *primitive {
-            Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
-            T!(OpenSquareBracket) => self.parse_array(), // Nested arrays
-            T!(Hash) => self.parse_set(),                // Nested sets
-            _ => self.error_in_place("Expected element expression"),
-        }
-    }
-
-    fn parse_collection(
-        &mut self,
-        collection_name: &str,
-        close_token: &Token,
-        create_expr: impl Fn(Vec<Expr>) -> Expr,
-    ) -> Expr {
-        debug!("Parsing {} expression", collection_name);
-        let mut elements = Vec::new();
-
-        if let Some(token) = self.peek() {
-            if **token == *close_token {
-                _ = token.accept();
-                debug!("Parsed empty {}", collection_name);
-                return create_expr(elements);
-            }
-            // Not empty, put the token back
-            token.recover();
-        }
-
-        // Parse collection elements
-        loop {
-            // Parse the next expression (element inside the collection)
-            debug!("About to parse {} element", collection_name);
-            let element_expr = self.parse_element_expr();
-            elements.push(element_expr);
-            debug!(
-                "Parsed {} element, now checking what follows",
-                collection_name
-            );
-
-            // Check what follows the expression
-            if let Some(token) = self.peek() {
-                debug!("Found token after element: {:?}", **token);
-                match **token {
-                    ref t if *t == T!(Comma) => {
-                        // Consume comma and continue to next element
-                        debug!("Found comma, consuming it");
-                        _ = token.accept();
-
-                        // Check for trailing comma before closing delimiter
-                        if let Some(next_token) = self.peek() {
-                            debug!("After comma, next token is: {:?}", **next_token);
-                            if **next_token == *close_token {
-                                debug!("Found trailing comma before closing delimiter, breaking");
-                                next_token.recover();
-                                break;
-                            }
-                            debug!("After comma, continuing to next element");
-                            next_token.recover();
-                        } else {
-                            debug!("No token after comma - unexpected end");
-                        }
-                    }
-                    ref t if *t == *close_token => {
-                        // End of collection - put the token back so expect_token can consume it
-                        token.recover();
-                        break;
-                    }
-                    _ => {
-                        let unexpected = token.accept();
-                        self.error_at(
-                            unexpected.span,
-                            format!(
-                                "Expected ',' or closing delimiter, found {:?}",
-                                unexpected.token
-                            ),
-                        );
-                    }
-                }
-            } else {
-                // Unexpected end of input (this will panic)
-                self.error_in_place(format!(
-                    "Unexpected end of input while parsing {collection_name}"
-                ));
-            }
-        }
-
-        self.expect_token(close_token);
-        debug!(
-            "Parsed {} with {} elements",
-            collection_name,
-            elements.len()
-        );
-        create_expr(elements)
     }
 }
