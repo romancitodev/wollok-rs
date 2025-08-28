@@ -18,6 +18,7 @@ pub enum Expr {
     Closure(ExprClosure),
     Const(ExprConst),
     Field(ExprField),
+    Class(ExprClass),
     // ForLoop(ExprForLoop),
     // Group(ExprGroup),
     If(ExprIf),
@@ -159,6 +160,11 @@ pub struct ExprNew {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprObject {
-    pub name: String,
     pub fields: Vec<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExprClass {
+    pub name: String,
+    pub params: Vec<Expr>,
 }

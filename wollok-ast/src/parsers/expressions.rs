@@ -5,7 +5,10 @@
 /// - Assignment expressions
 /// - Field access expressions
 use tracing::trace;
-use wollok_lexer::{macros::T, token::Token};
+use wollok_lexer::{
+    macros::{T, kw},
+    token::Token,
+};
 
 use crate::{
     expr::{Expr, ExprAssign, ExprField, ExprLit},
@@ -50,6 +53,11 @@ impl Ast<'_> {
                 name: ident.clone(),
                 base: Box::new(Expr::Self_),
             }),
+            kw!(New) => {
+                let name = self.expect_match("Expected class name", |t| t.into_ident());
+                let params = self.parse_params();
+                Expr::Class(crate::expr::ExprClass { name, params })
+            }
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),

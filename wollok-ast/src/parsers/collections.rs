@@ -31,10 +31,10 @@ impl Ast<'_> {
     }
 
     /// Generic parser for collections (arrays, sets) with custom delimiters
-    pub(crate) fn parse_collection(
+    pub(crate) fn parse_collection<'t>(
         &mut self,
-        collection_name: &str,
-        close_token: &Token,
+        collection_name: &'t str,
+        close_token: &'t Token,
         create_expr: impl Fn(Vec<Expr>) -> Expr,
     ) -> Expr {
         debug!("Parsing {} expression", collection_name);

@@ -242,6 +242,10 @@ pub enum Keyword {
     Property,
     Super,
     Return,
+    New,
+    Override,
+    Mixin,
+    Inherits,
 }
 
 impl fmt::Display for Keyword {
@@ -262,6 +266,10 @@ impl fmt::Display for Keyword {
             Keyword::Property => "property",
             Keyword::Super => "super",
             Keyword::Return => "return",
+            Keyword::New => "new",
+            Keyword::Override => "override",
+            Keyword::Mixin => "mixin",
+            Keyword::Inherits => "inherits",
         };
         write!(f, "{keyword}")
     }

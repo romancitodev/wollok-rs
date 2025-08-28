@@ -13,6 +13,7 @@ use wollok_lexer::{
 
 use crate::{
     ast::Stmt,
+    expr::Expr,
     item::{Ident, Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
     source::Ast,
 };
@@ -97,6 +98,55 @@ impl Ast<'_> {
                     let param_name = ident.clone();
                     trace!("Parsed parameter: {:?}", param_name);
                     params.push(Ident { name: param_name });
+                }
+                _ => {
+                    self.error_at(
+                        span,
+                        format!("Unexpected token in method signature: {parsed:?}"),
+                    );
+                }
+            }
+        }
+
+        self.expect_token(&T!(CloseParen));
+
+        trace!(
+            "Parsed method signature: {}({})",
+            name,
+            params
+                .iter()
+                .map(|p| p.name.as_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
+
+        Signature {
+            ident: name,
+            params,
+        }
+    }
+
+    pub(crate) fn parse_params(&mut self) -> Vec<Expr> {
+        let mut params = Vec::new();
+
+        self.expect_token(&T!(OpenParen));
+        loop {
+            let Some(token) = self.peek() else {
+                self.error_in_place("Unexpected end of input in method signature");
+            };
+
+            let (span, parsed) = token.split();
+
+            // we should expect some values as expressions maybe?
+
+            trace!("Parsed token in method signature: {:?}", parsed);
+            match parsed {
+                T!(CloseParen) => {
+                    token.recover();
+                    break;
+                } // End of parameters
+                T!(Comma) => {
+                    _ = token.accept(); // Consume comma and continue
                 }
                 _ => {
                     self.error_at(
