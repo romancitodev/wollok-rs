@@ -234,11 +234,9 @@ const duplicar = n => n * 2
 const saludar = nombre => "Hola " + nombre
 const sumar = (a, b) => a + b
 const obtenerFecha = () => new Date()
-
-// ❌ INCORRECTO: No se soportan llaves
-const duplicarMal = n => { n * 2 }  // ERROR
-const sumarMal = (a, b) => { 
-    return a + b  // ERROR
+const duplicarConBloque = n => { n * 2 }
+const sumarConBloque = (a, b) => {
+    return a + b
 }
 ```
 
@@ -366,37 +364,6 @@ object OperacionesMatematicas {
 // Uso
 OperacionesMatematicas.agregarOperacion("potencia", (a, b) => a ** b)
 const resultado = OperacionesMatematicas.calcular("potencia", 2, 3)  // 8
-```
-
-### Limitaciones Intencionales
-
-```wollok
-// ❌ NO soportado: Múltiples statements
-const complejo = n => {
-    const temp = n * 2
-    return temp + 1
-}
-
-// ✅ Alternativa: Usar métodos auxiliares
-object Helpers {
-    method procesoComplejo(n) {
-        const temp = n * 2
-        return temp + 1
-    }
-}
-const complejo = n => Helpers.procesoComplejo(n)
-
-// ❌ NO soportado: Control de flujo complejo
-const condicionalComplejo = n => {
-    if (n > 10) {
-        return "grande"
-    } else {
-        return "pequeño"
-    }
-}
-
-// ✅ Alternativa: Expresión ternaria o método auxiliar
-const condicionalSimple = n => if (n > 10) "grande" else "pequeño"
 ```
 
 ## Mixins
@@ -531,7 +498,7 @@ describe "Lista de tareas" {
         lista.agregar("Tarea 2")
     }
     
-    before {
+    after {
         lista.limpiar()
     }
     
