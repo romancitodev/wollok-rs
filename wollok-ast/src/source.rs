@@ -256,6 +256,18 @@ impl<'i> Ast<'i> {
         elements
     }
 
+    /// Parse a comma-separated list of identifiers (for method parameters)
+    pub fn parse_identifier_list(&mut self, terminator: &Token) -> Vec<crate::item::Ident> {
+        self.parse_separated_list(
+            |parser| {
+                let name = parser.expect_match("Expected identifier", |t| t.into_ident());
+                crate::item::Ident { name }
+            },
+            &T!(Comma),
+            terminator,
+        )
+    }
+
     /// Unified whitespace and comment handling
     pub fn skip_trivia(&mut self) {
         while let Some(token) = self.peek_token() {

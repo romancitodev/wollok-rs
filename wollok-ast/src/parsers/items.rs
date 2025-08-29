@@ -8,13 +8,12 @@
 use tracing::{debug, info, trace, warn};
 use wollok_lexer::{
     macros::{T, kw},
-    token::Token,
 };
 
 use crate::{
     ast::Stmt,
     expr::Expr,
-    item::{Ident, Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
+    item::{Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
     source::Ast,
 };
 
@@ -52,18 +51,17 @@ impl Ast<'_> {
             kw!(Method) => {
                 trace!("Parsing method declaration");
                 let signature = self.parse_method_signature();
-                let token = self.peek_expect();
-                if matches!(**token, T!(OpenBrace)) {
-                    _ = token.accept(); // Consume the opening brace
+                
+                if self.consume(&T!(OpenBrace)) {
                     let body = self.parse_block();
                     self.expect_token(&T!(CloseBrace));
-                    return Item::Method(ItemMethod { signature, body });
-                } else if matches!(**token, T!(Equals)) {
-                    _ = token.accept();
+                    Item::Method(ItemMethod { signature, body })
+                } else if self.consume(&T!(Equals)) {
                     let body = self.parse_inline_block();
-                    return Item::Method(ItemMethod { signature, body });
+                    Item::Method(ItemMethod { signature, body })
+                } else {
+                    self.error_in_place("Expected '{' or '=' after method signature");
                 }
-                self.error_in_place("Expected '{' or '=' after method signature");
             }
             _ => {
                 warn!("Unexpected token in item parsing: {:?}", *item);
@@ -74,42 +72,10 @@ impl Ast<'_> {
 
     /// Parses method signature including name and parameters
     pub(crate) fn parse_method_signature(&mut self) -> Signature {
-        let mut params = Vec::new();
-
         let name = self.expect_match("Expected method identifier", |t| t.into_ident());
         self.expect_token(&T!(OpenParen));
-        loop {
-            let Some(token) = self.peek() else {
-                self.error_in_place("Unexpected end of input in method signature");
-            };
-
-            let (span, parsed) = token.split();
-
-            trace!("Parsed token in method signature: {:?}", parsed);
-            match parsed {
-                T!(CloseParen) => {
-                    token.recover();
-                    break;
-                } // End of parameters
-                T!(Comma) => {
-                    _ = token.accept(); // Consume comma and continue
-                }
-                Token::Ident(ref ident) => {
-                    let param_name = ident.clone();
-                    trace!("Parsed parameter: {:?}", param_name);
-                    params.push(Ident { name: param_name });
-                }
-                _ => {
-                    self.error_at(
-                        span,
-                        format!("Unexpected token in method signature: {parsed:?}"),
-                    );
-                }
-            }
-        }
-
-        self.expect_token(&T!(CloseParen));
-
+        let params = self.parse_identifier_list(&T!(CloseParen));
+        
         trace!(
             "Parsed method signature: {}({})",
             name,
@@ -143,10 +109,10 @@ impl Ast<'_> {
         let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
         debug!("Parsing object '{}'", name);
         self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
-        self.skip_comments();
+        self.skip_trivia();
         let body = self.parse_object_body();
         self.expect_token(&T!(CloseBrace)); // Here we should expect the `}`
-        self.skip_comments();
+        self.skip_trivia();
         info!(
             "Successfully parsed object '{}' with {} items",
             name,
@@ -161,23 +127,17 @@ impl Ast<'_> {
         let mut body = Vec::new();
 
         loop {
-            let Some(first) = self.peek() else {
-                break;
-            };
-
-            if *first == T![Newline] {
-                // Consume the newline token and continue
-                _ = first.accept();
+            // Skip newlines
+            if self.consume(&T!(Newline)) {
                 continue;
             }
 
-            if *first == T![CloseBrace] {
-                first.recover();
+            // Check for end of object
+            if self.check(&T!(CloseBrace)) {
                 break;
             }
 
-            first.recover();
-
+            // Parse item
             let stmt = self.parse_item();
             Self::push_to_node(stmt, &mut body);
         }

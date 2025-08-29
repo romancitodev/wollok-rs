@@ -130,4 +130,27 @@ mod ast {
             }))]
         );
     }
+
+    #[test]
+    fn test_method_signature_parsing() {
+        let input = r#"object calculator {
+            method add(a, b) = 42
+        }"#;
+        let scope = parse(input);
+        
+        // Extract the object to check its method signature
+        if let [Stmt::Item(Item::Object(obj))] = scope.as_slice() {
+            assert_eq!(obj.name, "calculator");
+            if let [Item::Method(method)] = obj.body.as_slice() {
+                assert_eq!(method.signature.ident, "add");
+                assert_eq!(method.signature.params.len(), 2);
+                assert_eq!(method.signature.params[0].name, "a");
+                assert_eq!(method.signature.params[1].name, "b");
+            } else {
+                panic!("Expected one method in object body");
+            }
+        } else {
+            panic!("Expected object statement");
+        }
+    }
 }
