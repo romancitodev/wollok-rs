@@ -6,7 +6,7 @@ object pingüino { // hello
 
 	method job() = job
 	method do() = 2
-	method do(a,) {
+	method do(a) {
 
 
 		const hello = 1
@@ -19,4 +19,4 @@ object pingüino { // hello
 
 const ñandú = [[]]
 
-// const libro = new Libro()
+const libro = new Libro()
