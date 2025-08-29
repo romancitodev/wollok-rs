@@ -126,20 +126,18 @@ impl Ast<'_> {
         }
     }
 
+    /// Parses parameter expressions for class instantiation
     pub(crate) fn parse_params(&mut self) -> Vec<Expr> {
         let mut params = Vec::new();
 
         self.expect_token(&T!(OpenParen));
         loop {
             let Some(token) = self.peek() else {
-                self.error_in_place("Unexpected end of input in method signature");
+                self.error_in_place("Unexpected end of input in parameter list");
             };
 
-            let (span, parsed) = token.split();
+            let (_, parsed) = token.split();
 
-            // we should expect some values as expressions maybe?
-
-            trace!("Parsed token in method signature: {:?}", parsed);
             match parsed {
                 T!(CloseParen) => {
                     token.recover();
@@ -149,30 +147,15 @@ impl Ast<'_> {
                     _ = token.accept(); // Consume comma and continue
                 }
                 _ => {
-                    self.error_at(
-                        span,
-                        format!("Unexpected token in method signature: {parsed:?}"),
-                    );
+                    // Parse expression as parameter
+                    let expr = self.parse_expr();
+                    params.push(expr);
                 }
             }
         }
 
         self.expect_token(&T!(CloseParen));
-
-        trace!(
-            "Parsed method signature: {}({})",
-            name,
-            params
-                .iter()
-                .map(|p| p.name.as_str())
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-
-        Signature {
-            ident: name,
-            params,
-        }
+        params
     }
 
     /// Parses an object declaration with its body
