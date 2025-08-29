@@ -127,54 +127,12 @@ impl Ast<'_> {
     }
 
     pub(crate) fn parse_params(&mut self) -> Vec<Expr> {
-        let mut params = Vec::new();
-
         self.expect_token(&T!(OpenParen));
-        
-        // Check for empty parameter list
-        if let Some(token) = self.peek() {
-            if matches!(**token, T!(CloseParen)) {
-                _ = token.accept();
-                return params;
-            }
-            token.recover();
-        }
-
-        // Parse comma-separated expressions
-        loop {
-            let param_expr = self.parse_expr();
-            params.push(param_expr);
-            
-            let Some(token) = self.peek() else {
-                self.error_in_place("Unexpected end of input in parameter list");
-            };
-
-            match **token {
-                T!(CloseParen) => {
-                    _ = token.accept();
-                    break;
-                }
-                T!(Comma) => {
-                    _ = token.accept(); // Consume comma and continue
-                    // Check for trailing comma
-                    if let Some(next_token) = self.peek() {
-                        if matches!(**next_token, T!(CloseParen)) {
-                            _ = next_token.accept();
-                            break;
-                        }
-                        next_token.recover();
-                    }
-                }
-                _ => {
-                    let unexpected = token.accept();
-                    self.error_at(
-                        unexpected.span,
-                        format!("Expected ',' or ')' in parameter list, found {:?}", unexpected.token),
-                    );
-                }
-            }
-        }
-
+        let params = self.parse_separated_list(
+            |parser| parser.parse_expr(),
+            &T!(Comma),
+            &T!(CloseParen),
+        );
         trace!("Parsed {} parameters", params.len());
         params
     }

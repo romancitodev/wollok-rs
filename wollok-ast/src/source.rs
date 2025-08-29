@@ -1,6 +1,7 @@
 use wollok_lexer::{
     lexer::TokenStream,
     token::{Span, SpannedToken, Token},
+    macros::T,
 };
 
 use ariadne::{Color, Label, Report, ReportBuilder, ReportKind, Source};
@@ -27,6 +28,50 @@ impl<'i> Ast<'i> {
             base,
             last_offset: 0,
             tokens: tokens.collect_deque().unwrap_or_else(|_| VecDeque::new()),
+        }
+    }
+
+    // ======== New Token API - Phase 1 ========
+    
+    /// Check if next token matches without consuming it
+    pub fn check(&mut self, expected: &Token) -> bool {
+        if let Some(peeked) = self.peek() {
+            let matches = *peeked == *expected;
+            peeked.recover();
+            matches
+        } else {
+            false
+        }
+    }
+
+    /// Consume token if it matches, return whether it was consumed
+    pub fn consume(&mut self, expected: &Token) -> bool {
+        if let Some(peeked) = self.peek() {
+            if *peeked == *expected {
+                let _ = peeked.accept();
+                true
+            } else {
+                peeked.recover();
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Move to next token without any checks
+    pub fn advance(&mut self) -> Option<SpannedToken> {
+        self.tokens.pop_front().inspect(|t| self.last_offset = t.span.to)
+    }
+
+    /// Look at next token without consuming it (simple version)
+    pub fn peek_token(&mut self) -> Option<Token> {
+        if let Some(peeked) = self.peek() {
+            let token = peeked.token.token.clone();
+            peeked.recover();
+            Some(token)
+        } else {
+            None
         }
     }
 
@@ -154,6 +199,76 @@ impl<'i> Ast<'i> {
         }
 
         panic!("{msg}");
+    }
+
+    // ======== Helper Methods - Phase 1 ========
+
+    /// Try parsing with automatic rollback on failure
+    pub fn optional<T>(&mut self, mut parser: impl FnMut(&mut Self) -> Option<T>) -> Option<T> {
+        // Create a checkpoint by saving the current state
+        let checkpoint_tokens = self.tokens.clone();
+        let checkpoint_offset = self.last_offset;
+        
+        // Try to parse
+        if let Some(result) = parser(self) {
+            Some(result)
+        } else {
+            // Rollback on failure
+            self.tokens = checkpoint_tokens;
+            self.last_offset = checkpoint_offset;
+            None
+        }
+    }
+
+    /// Parse a comma-separated list with generic element parser
+    pub fn parse_separated_list<T>(
+        &mut self,
+        element_parser: impl Fn(&mut Self) -> T,
+        separator: &Token,
+        terminator: &Token,
+    ) -> Vec<T> {
+        let mut elements = Vec::new();
+
+        // Check for empty list
+        if self.check(terminator) {
+            self.consume(terminator);
+            return elements;
+        }
+
+        // Parse first element
+        elements.push(element_parser(self));
+
+        // Parse remaining elements
+        while self.consume(separator) {
+            // Check for trailing separator
+            if self.check(terminator) {
+                self.consume(terminator);
+                break;
+            }
+            elements.push(element_parser(self));
+        }
+
+        // Consume terminator
+        if !self.consume(terminator) {
+            self.error_in_place(format!("Expected '{}'", terminator));
+        }
+
+        elements
+    }
+
+    /// Unified whitespace and comment handling
+    pub fn skip_trivia(&mut self) {
+        while let Some(token) = self.peek_token() {
+            match token {
+                Token::Comment(_) => {
+                    let _ = self.advance();
+                },
+                T!(Newline) => {
+                    let _ = self.advance();
+                },
+                _ => break,
+            }
+        }
     }
 }
 

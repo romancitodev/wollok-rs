@@ -29,17 +29,10 @@ impl Ast<'_> {
                 break;
             }
 
-            let Some(token) = self.peek() else {
-                break;
-            };
-
             // Check for block end
-            if matches!(**token, T!(CloseBrace)) {
-                token.recover();
+            if self.check(&T!(CloseBrace)) {
                 break;
             }
-
-            token.recover();
 
             // Parse statement or expression
             let stmt = self.parse_block_statement();
@@ -94,21 +87,17 @@ impl Ast<'_> {
     pub(crate) fn parse_inline_block(&mut self) -> Block {
         trace!("Parsing inline block");
         let mut stmts = Vec::new();
-        while let Some(token) = self.peek() {
-            match **token {
-                T!(Newline) => {
-                    trace!("Finished parsing inline block");
-                    token.recover();
-                    break;
-                }
-                _ => {
-                    token.recover();
-                    let stmt = self.parse_expr();
-                    trace!("Parsed statement: {:?}", stmt);
-                    stmts.push(stmt);
-                }
-            }
+        
+        // Check if we hit a newline (end of inline block)
+        if self.check(&T!(Newline)) {
+            trace!("Empty inline block");
+            return Block { stmts };
         }
+        
+        // Parse single expression
+        let stmt = self.parse_expr();
+        trace!("Parsed statement: {:?}", stmt);
+        stmts.push(stmt);
 
         Block { stmts }
     }

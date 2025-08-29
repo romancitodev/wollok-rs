@@ -83,4 +83,51 @@ mod ast {
             }))]
         );
     }
+
+    #[test]
+    fn test_set_parse() {
+        let input = "const numbers = #{1, 2, 3}";
+        let scope = parse(input);
+        assert_eq!(
+            *scope,
+            vec![Stmt::Item(Item::Const(ItemConst {
+                name: "numbers".into(),
+                expr: Box::new(Expr::Set(crate::expr::ExprSet {
+                    elements: vec![
+                        Expr::Lit(ExprLit { value: 1.into() }),
+                        Expr::Lit(ExprLit { value: 2.into() }),
+                        Expr::Lit(ExprLit { value: 3.into() }),
+                    ],
+                })),
+            }))]
+        );
+    }
+
+    #[test]
+    fn test_nested_collections() {
+        let input = "const nested = [[1, 2], [3, 4]]";
+        let scope = parse(input);
+        assert_eq!(
+            *scope,
+            vec![Stmt::Item(Item::Const(ItemConst {
+                name: "nested".into(),
+                expr: Box::new(Expr::Array(ExprArray {
+                    elements: vec![
+                        Expr::Array(ExprArray {
+                            elements: vec![
+                                Expr::Lit(ExprLit { value: 1.into() }),
+                                Expr::Lit(ExprLit { value: 2.into() }),
+                            ],
+                        }),
+                        Expr::Array(ExprArray {
+                            elements: vec![
+                                Expr::Lit(ExprLit { value: 3.into() }),
+                                Expr::Lit(ExprLit { value: 4.into() }),
+                            ],
+                        }),
+                    ],
+                })),
+            }))]
+        );
+    }
 }
