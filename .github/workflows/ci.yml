@@ -32,7 +32,7 @@ jobs:
         uses: ./.github/workflows/format.yml
         with:
           name: Checks
-          runs-on: ${{ inputs.runs-on }}
+          runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
           command: ${{ inputs.checks-command }}
 
     check-clippy:
@@ -40,7 +40,7 @@ jobs:
         uses: ./.github/workflows/clippy.yml
         with:
           name: Clippy
-          runs-on: ${{ inputs.runs-on }}
+          runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
           command: ${{ inputs.clippy-command }}
     
     check-tests:
@@ -48,5 +48,5 @@ jobs:
         uses: ./.github/workflows/tests.yml
         with:
           name: Tests
-          runs-on: ${{ inputs.runs-on }}
+          runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
           command: ${{ inputs.tests-command }}
