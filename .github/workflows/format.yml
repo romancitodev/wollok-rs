@@ -1,0 +1,30 @@
+name: Format
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        default: ubuntu-latest
+        required: false
+        type: string
+      name:
+        default: Checks
+        required: false
+        type: string
+      command:
+        default: "--all --check"
+        required: true
+        type: string
+
+jobs:
+  check-fmt:
+    name: ${{ inputs.name }}
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - name: checks
+        run: |
+          cargo fmt ${{ inputs.command }}

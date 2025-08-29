@@ -1,50 +1,45 @@
-name: CI
+name: Quality Gate
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      runs-on:
+        default: ubuntu-latest
+        required: false
+        type: string
+      checks-command:
+        default: "--all --check"
+        required: false
+        type: string
+      clippy-command:
+        default: "-- --warn clippy::pedantic -D warnings"
+        required: false
+        type: string
+      tests-command:
+        default: "test"
+        required: false
+        type: string
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust: [1.56.0, 1.57.0, stable]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Rust
-        uses: rust-lang/rustup@v1
+    check-format:
+        uses: ./.github/workflows/format.yml
         with:
-          toolchain: ${{ matrix.rust }}
-          override: true
+          name: Checks
+          runs-on: ${{ inputs.runs-on }}
+          command: ${{ inputs.checks-command }}
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v2
+    check-clippy:
+        needs: [check-format]
+        uses: ./.github/workflows/clippy.yml
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
-
-      - name: Cache Cargo build
-        uses: actions/cache@v2
+          name: Clippy
+          runs-on: ${{ inputs.runs-on }}
+          command: ${{ inputs.clippy-command }}
+    
+    check-tests:
+        needs: [check-clippy]
+        uses: ./.github/workflows/tests.yml
         with:
-          path: target
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-
-
-      - name: Run cargo check
-        run: cargo check
-
-      - name: Run cargo fmt
-        run: cargo fmt -- --check
-
-      - name: Run cargo clippy
-        run: cargo clippy -- -D warnings
-
-      - name: Run cargo test
-        run: cargo test
+          name: Tests
+          runs-on: ${{ inputs.runs-on }}
+          command: ${{ inputs.tests-command }}

@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        default: ubuntu-latest
+        required: false
+        type: string
+      name:
+        default: Tests
+        required: false
+        type: string
+      command:
+        default: "test"
+        required: true
+        type: string
+
+jobs:
+    check-tests:
+        runs-on: ubuntu-22.04
+        steps:
+          - name: Checkout
+            uses: actions/checkout@v4
+
+          - uses: dtolnay/rust-toolchain@stable
+          
+          - uses: Swatinem/rust-cache@v2
+          - name: ${{ inputs.name }}
+            run: |
+                cargo ${{ inputs.command }}
