@@ -130,49 +130,53 @@ impl Ast<'_> {
         let mut params = Vec::new();
 
         self.expect_token(&T!(OpenParen));
+        
+        // Check for empty parameter list
+        if let Some(token) = self.peek() {
+            if matches!(**token, T!(CloseParen)) {
+                _ = token.accept();
+                return params;
+            }
+            token.recover();
+        }
+
+        // Parse comma-separated expressions
         loop {
+            let param_expr = self.parse_expr();
+            params.push(param_expr);
+            
             let Some(token) = self.peek() else {
-                self.error_in_place("Unexpected end of input in method signature");
+                self.error_in_place("Unexpected end of input in parameter list");
             };
 
-            let (span, parsed) = token.split();
-
-            // we should expect some values as expressions maybe?
-
-            trace!("Parsed token in method signature: {:?}", parsed);
-            match parsed {
+            match **token {
                 T!(CloseParen) => {
-                    token.recover();
+                    _ = token.accept();
                     break;
-                } // End of parameters
+                }
                 T!(Comma) => {
                     _ = token.accept(); // Consume comma and continue
+                    // Check for trailing comma
+                    if let Some(next_token) = self.peek() {
+                        if matches!(**next_token, T!(CloseParen)) {
+                            _ = next_token.accept();
+                            break;
+                        }
+                        next_token.recover();
+                    }
                 }
                 _ => {
+                    let unexpected = token.accept();
                     self.error_at(
-                        span,
-                        format!("Unexpected token in method signature: {parsed:?}"),
+                        unexpected.span,
+                        format!("Expected ',' or ')' in parameter list, found {:?}", unexpected.token),
                     );
                 }
             }
         }
 
-        self.expect_token(&T!(CloseParen));
-
-        trace!(
-            "Parsed method signature: {}({})",
-            name,
-            params
-                .iter()
-                .map(|p| p.name.as_str())
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-
-        Signature {
-            ident: name,
-            params,
-        }
+        trace!("Parsed {} parameters", params.len());
+        params
     }
 
     /// Parses an object declaration with its body
