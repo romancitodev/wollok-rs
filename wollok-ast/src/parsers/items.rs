@@ -6,9 +6,7 @@
 /// - Property declarations
 /// - Const and let declarations
 use tracing::{debug, info, trace, warn};
-use wollok_lexer::{
-    macros::{T, kw},
-};
+use wollok_lexer::macros::{T, kw};
 
 use crate::{
     ast::Stmt,
@@ -51,7 +49,7 @@ impl Ast<'_> {
             kw!(Method) => {
                 trace!("Parsing method declaration");
                 let signature = self.parse_method_signature();
-                
+
                 if self.consume(&T!(OpenBrace)) {
                     let body = self.parse_block();
                     self.expect_token(&T!(CloseBrace));
@@ -75,7 +73,7 @@ impl Ast<'_> {
         let name = self.expect_match("Expected method identifier", |t| t.into_ident());
         self.expect_token(&T!(OpenParen));
         let params = self.parse_identifier_list(&T!(CloseParen));
-        
+
         trace!(
             "Parsed method signature: {}({})",
             name,
@@ -94,11 +92,7 @@ impl Ast<'_> {
 
     pub(crate) fn parse_params(&mut self) -> Vec<Expr> {
         self.expect_token(&T!(OpenParen));
-        let params = self.parse_separated_list(
-            |parser| parser.parse_expr(),
-            &T!(Comma),
-            &T!(CloseParen),
-        );
+        let params = self.parse_separated_list(Ast::parse_expr, &T!(Comma), &T!(CloseParen));
         trace!("Parsed {} parameters", params.len());
         params
     }

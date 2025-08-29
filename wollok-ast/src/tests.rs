@@ -10,7 +10,7 @@ mod ast {
 
     use crate::{
         ast::{Scope, Stmt},
-        expr::{Block, Expr, ExprArray, ExprAssign, ExprField, ExprLit},
+        expr::{Block, Expr, ExprArray, ExprAssign, ExprClass, ExprField, ExprLit},
         item::{Item, ItemConst, ItemLet, ItemMethod, ItemObject, Signature},
     };
 
@@ -133,11 +133,11 @@ mod ast {
 
     #[test]
     fn test_method_signature_parsing() {
-        let input = r#"object calculator {
+        let input = r"object calculator {
             method add(a, b) = 42
-        }"#;
+        }";
         let scope = parse(input);
-        
+
         // Extract the object to check its method signature
         if let [Stmt::Item(Item::Object(obj))] = scope.as_slice() {
             assert_eq!(obj.name, "calculator");
@@ -152,5 +152,65 @@ mod ast {
         } else {
             panic!("Expected object statement");
         }
+    }
+
+    #[test]
+    fn test_class_expr() {
+        let input = "const bar = new Foo()";
+        let scope = parse(input);
+
+        assert_eq!(
+            *scope,
+            vec![Stmt::Item(Item::Const(ItemConst {
+                name: "bar".into(),
+                expr: Box::new(Expr::Class(ExprClass {
+                    name: "Foo".into(),
+                    params: vec![]
+                }))
+            }))]
+        );
+    }
+
+    #[test]
+    fn test_class_with_args() {
+        let input = "const bar = new Foo(1, 2)";
+        let scope = parse(input);
+
+        assert_eq!(
+            *scope,
+            vec![Stmt::Item(Item::Const(ItemConst {
+                name: "bar".into(),
+                expr: Box::new(Expr::Class(ExprClass {
+                    name: "Foo".into(),
+                    params: vec![
+                        Expr::Lit(ExprLit { value: 1.into() }),
+                        Expr::Lit(ExprLit { value: 2.into() }),
+                    ]
+                }))
+            }))]
+        );
+    }
+
+    #[test]
+    fn test_complex_args() {
+        let input = "const bar = new Foo(new Bar(), 2)";
+        let scope = parse(input);
+
+        assert_eq!(
+            *scope,
+            vec![Stmt::Item(Item::Const(ItemConst {
+                name: "bar".into(),
+                expr: Box::new(Expr::Class(ExprClass {
+                    name: "Foo".into(),
+                    params: vec![
+                        Expr::Class(ExprClass {
+                            name: "Bar".into(),
+                            params: vec![]
+                        }),
+                        Expr::Lit(ExprLit { value: 2.into() }),
+                    ]
+                }))
+            }))]
+        );
     }
 }

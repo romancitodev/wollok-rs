@@ -1,7 +1,7 @@
 use wollok_lexer::{
     lexer::TokenStream,
-    token::{Span, SpannedToken, Token},
     macros::T,
+    token::{Span, SpannedToken, Token},
 };
 
 use ariadne::{Color, Label, Report, ReportBuilder, ReportKind, Source};
@@ -32,7 +32,7 @@ impl<'i> Ast<'i> {
     }
 
     // ======== New Token API - Phase 1 ========
-    
+
     /// Check if next token matches without consuming it
     pub fn check(&mut self, expected: &Token) -> bool {
         if let Some(peeked) = self.peek() {
@@ -61,7 +61,9 @@ impl<'i> Ast<'i> {
 
     /// Move to next token without any checks
     pub fn advance(&mut self) -> Option<SpannedToken> {
-        self.tokens.pop_front().inspect(|t| self.last_offset = t.span.to)
+        self.tokens
+            .pop_front()
+            .inspect(|t| self.last_offset = t.span.to)
     }
 
     /// Look at next token without consuming it (simple version)
@@ -208,7 +210,7 @@ impl<'i> Ast<'i> {
         // Create a checkpoint by saving the current state
         let checkpoint_tokens = self.tokens.clone();
         let checkpoint_offset = self.last_offset;
-        
+
         // Try to parse
         if let Some(result) = parser(self) {
             Some(result)
@@ -250,7 +252,7 @@ impl<'i> Ast<'i> {
 
         // Consume terminator
         if !self.consume(terminator) {
-            self.error_in_place(format!("Expected '{}'", terminator));
+            self.error_in_place(format!("Expected '{terminator}'"));
         }
 
         elements
@@ -272,12 +274,9 @@ impl<'i> Ast<'i> {
     pub fn skip_trivia(&mut self) {
         while let Some(token) = self.peek_token() {
             match token {
-                Token::Comment(_) => {
+                Token::Comment(_) | T!(Newline) => {
                     let _ = self.advance();
-                },
-                T!(Newline) => {
-                    let _ = self.advance();
-                },
+                }
                 _ => break,
             }
         }

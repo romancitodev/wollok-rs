@@ -26,6 +26,7 @@ impl TokenParser for KeywordParser {
             "property".value(Keyword::Property),
             "super".value(Keyword::Super),
             "return".value(Keyword::Return),
+            "new".value(Keyword::New),
         ))
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))
