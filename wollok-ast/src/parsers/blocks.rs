@@ -87,13 +87,13 @@ impl Ast<'_> {
     pub(crate) fn parse_inline_block(&mut self) -> Block {
         trace!("Parsing inline block");
         let mut stmts = Vec::new();
-        
+
         // Check if we hit a newline (end of inline block)
         if self.check(&T!(Newline)) {
             trace!("Empty inline block");
             return Block { stmts };
         }
-        
+
         // Parse single expression
         let stmt = self.parse_expr();
         trace!("Parsed statement: {:?}", stmt);

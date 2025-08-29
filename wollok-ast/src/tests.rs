@@ -251,7 +251,9 @@ mod ast {
                 expr: Box::new(Expr::Array(ExprArray {
                     elements: vec![
                         Expr::Lit(ExprLit { value: 1.into() }),
-                        Expr::Lit(ExprLit { value: "hello".into() }),
+                        Expr::Lit(ExprLit {
+                            value: "hello".into()
+                        }),
                         Expr::Lit(ExprLit { value: true.into() }),
                     ],
                 })),
@@ -270,8 +272,12 @@ mod ast {
                 expr: Box::new(Expr::Set(crate::expr::ExprSet {
                     elements: vec![
                         Expr::Lit(ExprLit { value: 1.into() }),
-                        Expr::Lit(ExprLit { value: "hello".into() }),
-                        Expr::Lit(ExprLit { value: false.into() }),
+                        Expr::Lit(ExprLit {
+                            value: "hello".into()
+                        }),
+                        Expr::Lit(ExprLit {
+                            value: false.into()
+                        }),
                     ],
                 })),
             }))]
@@ -300,7 +306,9 @@ mod ast {
                                 Expr::Lit(ExprLit { value: 4.into() }),
                             ],
                         }),
-                        Expr::Lit(ExprLit { value: "text".into() }),
+                        Expr::Lit(ExprLit {
+                            value: "text".into()
+                        }),
                     ],
                 })),
             }))]
@@ -384,14 +392,14 @@ mod ast {
         if let [Stmt::Item(Item::Object(obj))] = scope.as_slice() {
             assert_eq!(obj.name, "complex");
             assert_eq!(obj.body.len(), 2);
-            
+
             // Check const
             if let Item::Const(const_item) = &obj.body[0] {
                 assert_eq!(const_item.name, "value");
             } else {
                 panic!("Expected const item");
             }
-            
+
             // Check let
             if let Item::Let(let_item) = &obj.body[1] {
                 assert_eq!(let_item.name, "mutable");
@@ -468,7 +476,7 @@ mod ast {
     fn test_deeply_nested_collections() {
         let input = "const deep = [[[1, 2], [3, 4]], [[5, 6], [7, 8]]]";
         let scope = parse(input);
-        
+
         assert_eq!(
             *scope,
             vec![Stmt::Item(Item::Const(ItemConst {
@@ -517,7 +525,7 @@ mod ast {
     fn test_parenthesized_expressions() {
         let input = "const value = (42)";
         let scope = parse(input);
-        
+
         assert_eq!(
             *scope,
             vec![Stmt::Item(Item::Const(ItemConst {
@@ -535,10 +543,15 @@ mod ast {
         const third = [1, 2, 3]
         "#;
         let scope = parse(input);
-        
+
         assert_eq!(scope.len(), 3);
-        
-        if let [Stmt::Item(Item::Const(first)), Stmt::Item(Item::Const(second)), Stmt::Item(Item::Const(third))] = scope.as_slice() {
+
+        if let [
+            Stmt::Item(Item::Const(first)),
+            Stmt::Item(Item::Const(second)),
+            Stmt::Item(Item::Const(third)),
+        ] = scope.as_slice()
+        {
             assert_eq!(first.name, "first");
             assert_eq!(second.name, "second");
             assert_eq!(third.name, "third");
@@ -554,9 +567,9 @@ mod ast {
         let anotherMutable = "text"
         "#;
         let scope = parse(input);
-        
+
         assert_eq!(scope.len(), 2);
-        
+
         if let [Stmt::Item(Item::Let(first)), Stmt::Item(Item::Let(second))] = scope.as_slice() {
             assert_eq!(first.name, "mutable");
             assert_eq!(second.name, "anotherMutable");
@@ -572,13 +585,13 @@ mod ast {
             property name = "default"
         }"#;
         let scope = parse(input);
-        
+
         assert_eq!(scope.len(), 1);
-        
+
         if let [Stmt::Item(Item::Object(obj))] = scope.as_slice() {
             assert_eq!(obj.name, "example");
             assert_eq!(obj.body.len(), 2);
-            
+
             if let [Item::Property(first), Item::Property(second)] = obj.body.as_slice() {
                 assert_eq!(first.name, "count");
                 assert_eq!(second.name, "name");
@@ -599,15 +612,15 @@ mod ast {
             }
         }"#;
         let scope = parse(input);
-        
+
         if let [Stmt::Item(Item::Object(obj))] = scope.as_slice() {
             assert_eq!(obj.name, "manager");
             assert_eq!(obj.body.len(), 2);
-            
+
             if let [Item::Let(_), Item::Method(method)] = obj.body.as_slice() {
                 assert_eq!(method.signature.ident, "updateData");
                 assert_eq!(method.body.stmts.len(), 1);
-                
+
                 // Verify the assignment is to an array
                 if let Expr::Assign(assign) = &method.body.stmts[0] {
                     if let Expr::Array(_) = assign.right.as_ref() {
