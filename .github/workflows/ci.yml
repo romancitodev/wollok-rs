@@ -23,7 +23,7 @@ on:
         required: false
         type: string
       tests-command:
-        default: "test"
+        default: "test --workspace --lib"
         required: false
         type: string
 
