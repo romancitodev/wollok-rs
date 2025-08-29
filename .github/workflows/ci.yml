@@ -33,7 +33,7 @@ jobs:
         with:
           name: Checks
           runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
-          command: ${{ inputs.checks-command }}
+          command: ${{ inputs.checks-command || '--all --check' }}
 
     check-clippy:
         needs: [check-format]
@@ -41,12 +41,12 @@ jobs:
         with:
           name: Clippy
           runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
-          command: ${{ inputs.clippy-command }}
-    
+          command: ${{ inputs.clippy-command || '-- --warn clippy::pedantic -D warnings' }}
+
     check-tests:
         needs: [check-clippy]
         uses: ./.github/workflows/tests.yml
         with:
           name: Tests
           runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
-          command: ${{ inputs.tests-command }}
+          command: ${{ inputs.tests-command || 'test --workspace --lib' }}
