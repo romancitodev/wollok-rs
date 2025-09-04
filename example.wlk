@@ -19,4 +19,12 @@ object pingüino { // hello
 
 const ñandú = [[]]
 
-const libro = new Libro(1)
+const libro = new Libro()
+
+const a = (1 + 1 * (2 / 1) )
+
+// Tests para precedencia de operadores
+const expr1 = 1 + 2 * 3    // Debería ser: 1 + (2 * 3) = 7
+const expr2 = (1 + 2) * 3  // Debería ser: (1 + 2) * 3 = 9
+const expr3 = (1 + 2) * (3 - 4)
+const expr4 = (1 + 2 * 3 - 4)

@@ -28,6 +28,11 @@ pub enum BinaryOp {
     Ne,  // !=
     And, // &&
     Or,  // ||
+
+    Plus,     // +
+    Minus,    // -
+    Multiply, // *
+    Div,      // /
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,6 +77,10 @@ impl fmt::Display for BinaryOp {
             BinaryOp::Ne => write!(f, "!="),
             BinaryOp::And => write!(f, "&&"),
             BinaryOp::Or => write!(f, "||"),
+            BinaryOp::Plus => write!(f, "+"),
+            BinaryOp::Minus => write!(f, "-"),
+            BinaryOp::Multiply => write!(f, "*"),
+            BinaryOp::Div => write!(f, "/"),
         }
     }
 }

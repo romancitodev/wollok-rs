@@ -138,7 +138,6 @@ pub enum Punctuation {
     Minus,
     Multiply,
     Div,
-    Pow,
 
     // Bitwise
     BitAnd,
@@ -178,7 +177,6 @@ impl fmt::Display for Punctuation {
             Punctuation::Minus => "-",
             Punctuation::Multiply => "*",
             Punctuation::Div => "/",
-            Punctuation::Pow => "^",
 
             Punctuation::BitAnd => "&",
             Punctuation::BitOr => "|",

@@ -4,14 +4,15 @@
 /// - Primary expressions (literals, identifiers, parentheses)
 /// - Assignment expressions
 /// - Field access expressions
-use tracing::trace;
+use tracing::{debug, trace};
+use wollok_common::ast::BinaryOp;
 use wollok_lexer::{
     macros::{T, kw},
     token::Token,
 };
 
 use crate::{
-    expr::{Expr, ExprAssign, ExprField, ExprLit},
+    expr::{Expr, ExprAssign, ExprBinary, ExprField, ExprLit},
     source::Ast,
 };
 
@@ -40,11 +41,17 @@ impl Ast<'_> {
 
     /// Parses primary expressions (literals, identifiers, collections, etc.)
     pub(crate) fn parse_primary_expr(&mut self) -> Expr {
-        let primitive = self.expect();
-        trace!("Parsing primary expression with token: {:?}", *primitive);
+        let expr = self.parse_atomic_expr();
+        self.parse_binary_expr(expr, 0)
+    }
+
+    /// Parses atomic expressions without binary operations
+    pub(crate) fn parse_atomic_expr(&mut self) -> Expr {
+        let token = self.expect();
+        trace!("Parsing atomic expression with token: {:?}", *token);
         self.skip_comments();
 
-        match *primitive {
+        match *token {
             Token::Ident(ref ident) => Expr::Field(ExprField {
                 name: ident.clone(),
                 base: Box::new(Expr::Self_),
@@ -62,8 +69,46 @@ impl Ast<'_> {
         }
     }
 
+    /// Parse binary expressions using precedence climbing
+    pub(crate) fn parse_binary_expr(&mut self, mut lhs: Expr, min_prec: u8) -> Expr {
+        while let Some((op, prec, right_assoc)) = self.peek_operator() {
+            if prec < min_prec {
+                break;
+            }
+
+            self.advance(); // consume operator
+            let next_prec = if right_assoc { prec } else { prec + 1 };
+            let rhs_atomic = self.parse_atomic_expr();
+            let rhs = self.parse_binary_expr(rhs_atomic, next_prec);
+
+            lhs = Expr::Binary(ExprBinary {
+                left: Box::new(lhs),
+                right: Box::new(rhs),
+                op,
+            });
+        }
+        lhs
+    }
+
+    /// Peek at the next operator, returning (BinaryOp, precedence, is_right_assoc)
+    fn peek_operator(&mut self) -> Option<(BinaryOp, u8, bool)> {
+        self.peek().and_then(|peeked| {
+            let token = &peeked.token.token;
+            let result = match token {
+                T!(Multiply) => Some((BinaryOp::Multiply, 4, false)),
+                T!(Div) => Some((BinaryOp::Div, 4, false)),
+                T!(Plus) => Some((BinaryOp::Plus, 2, false)),
+                T!(Minus) => Some((BinaryOp::Minus, 2, false)),
+                _ => None,
+            };
+            peeked.recover();
+            result
+        })
+    }
+
     /// Parses expressions enclosed in parentheses
     pub(crate) fn parse_parenthesized_expr(&mut self) -> Expr {
+        debug!("Parsing the parenthized expr");
         let expr = self.parse_expr();
         self.expect_token(&T!(CloseParen));
         expr // For now, we just return the inner expression

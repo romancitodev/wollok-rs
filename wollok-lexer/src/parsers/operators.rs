@@ -1,10 +1,9 @@
-use winnow::{Parser, combinator::alt};
-
 use crate::{
     error::{Result, Src},
     parsers::TokenParser,
     token::{Punctuation, Span, SpannedToken, Token},
 };
+use winnow::{Parser, combinator::alt};
 
 pub struct OperatorParser;
 
@@ -13,10 +12,9 @@ impl TokenParser for OperatorParser {
         // Por ahora los operadores están en punctuation
         // Aquí podríamos agregar operadores matemáticos específicos como +, -, *, /, %
         alt((
-            "**".value(Punctuation::Pow),
+            "*".value(Punctuation::Multiply),
             "+".value(Punctuation::Plus),
             "-".value(Punctuation::Minus),
-            "*".value(Punctuation::Multiply),
             "/".value(Punctuation::Div),
         ))
         .with_span()
