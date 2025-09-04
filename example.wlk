@@ -19,4 +19,4 @@ object pingüino { // hello
 
 const ñandú = [[]]
 
-const libro = new Libro()
+const libro = new Libro(1)

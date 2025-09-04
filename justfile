@@ -5,10 +5,10 @@ default:
   just -l
 
 workspace:
-  cargo test --workspace --lib
+  cargo nextest run --workspace
 
 test package:
-  cargo test --package {{package}} --lib
+  cargo nextest run --package {{package}} --lib
 
 run filter="trace":
   with-env { RUST_LOG: "wollok={{filter}}" } { cargo run }
