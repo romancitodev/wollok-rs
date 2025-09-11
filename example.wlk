@@ -21,11 +21,13 @@ object pingüino { // hello
 }
 
 class Pepe {
-	let age = 18
+	let age = pepe.coches.foo()
 }
 
 class Moto inherits Vehiculo {
-	method run() = 0
+	override method run() = 0
+	override fallible method stop() = false
+	fallible method start() = false
 }
 
 const ñandú = [[]]

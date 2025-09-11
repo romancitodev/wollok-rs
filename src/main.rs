@@ -1,7 +1,7 @@
 use std::{
     env,
-    fs::{File, read_to_string},
-    io::{self, Error, Read},
+    fs::read_to_string,
+    io::{self, Error},
 };
 
 use tracing::debug;

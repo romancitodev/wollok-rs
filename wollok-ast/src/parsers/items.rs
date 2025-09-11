@@ -11,11 +11,46 @@ use wollok_lexer::macros::{T, kw};
 use crate::{
     ast::Stmt,
     expr::Expr,
-    item::{Item, ItemClass, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
+    item::{
+        Item, ItemClass, ItemConst, ItemLet, ItemMethod, ItemObject, ItemPrefixedMethod,
+        ItemProperty, Prefix, Signature,
+    },
     source::Ast,
 };
 
 impl Ast<'_> {
+    fn parse_override(&mut self) -> (Item, Prefix) {
+        let item = self.parse_item();
+        if self.consume(&kw!(Fallible)) {
+            info!("Entering on fallible method");
+            (item, Prefix::OverrideFallible)
+        } else {
+            (item, Prefix::Override)
+        }
+    }
+
+    pub(crate) fn parse_class_item(&mut self) -> Item {
+        self.skip_comments();
+        if self.consume(&kw!(Override)) {
+            info!("Entering on override item");
+            let (item, prefix) = self.parse_override();
+            let Item::Method(method) = item else {
+                self.error_in_place("expected a method");
+            };
+            Item::PrefixedMethod(ItemPrefixedMethod { prefix, method })
+        } else if self.consume(&kw!(Fallible)) {
+            let Item::Method(method) = self.parse_item() else {
+                self.error_in_place("expected a method");
+            };
+            Item::PrefixedMethod(ItemPrefixedMethod {
+                prefix: Prefix::Fallible,
+                method,
+            })
+        } else {
+            self.parse_item()
+        }
+    }
+
     /// Parses items (const, let, property, method declarations)
     pub(crate) fn parse_item(&mut self) -> Item {
         self.skip_comments();
@@ -202,7 +237,7 @@ impl Ast<'_> {
             }
 
             // Parse item
-            let stmt = self.parse_item();
+            let stmt = self.parse_class_item();
             Self::push_to_node(stmt, &mut body);
         }
 

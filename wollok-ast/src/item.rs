@@ -9,6 +9,7 @@ pub enum Item {
     Let(ItemLet),
     Property(ItemProperty),
     Method(ItemMethod),
+    PrefixedMethod(ItemPrefixedMethod),
     Class(ItemClass),
     Object(ItemObject),
     Import(ItemImport),
@@ -51,6 +52,19 @@ pub struct ItemMethod {
     pub signature: Signature,
     pub body: Block,
     pub inline: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Prefix {
+    Override,
+    Fallible,
+    OverrideFallible,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ItemPrefixedMethod {
+    pub prefix: Prefix,
+    pub method: ItemMethod,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -103,6 +117,7 @@ impl Display for Item {
             Item::Test(item) => write!(f, "{item}"),
             Item::Program(item) => write!(f, "{item}"),
             Item::Package(item) => write!(f, "{item}"),
+            Item::PrefixedMethod(item) => write!(f, "{item}"),
         }
     }
 }
@@ -252,5 +267,15 @@ impl Display for ItemPackage {
             write!(f, " {item}; ")?;
         }
         writeln!(f, " }}")
+    }
+}
+impl Display for ItemPrefixedMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.prefix {
+            Prefix::Override => write!(f, "{}", "override ".magenta()),
+            Prefix::Fallible => write!(f, "{}", "fallible ".magenta()),
+            Prefix::OverrideFallible => write!(f, "{}", "override fallible ".magenta()),
+        }?;
+        write!(f, "{}", self.method)
     }
 }
