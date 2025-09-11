@@ -1,9 +1,7 @@
+use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use wollok_ast::ast::Scope;
 use wollok_lexer::lexer::TokenStream;
-
-mod pretty_print;
-use pretty_print::pretty_print_scope;
 
 fn init_tracing() {
     // Configurar tracing simple a stdout
@@ -22,9 +20,7 @@ fn main() {
     let tokens = TokenStream::new(base);
     let scope = Scope::from_tokens(base, tokens);
 
-    // Pretty print with colors
-    println!("{}", pretty_print_scope(&scope));
+    println!("{scope}");
 
-    // Also log the debug version for comparison
-    // debug!("Parsed AST scope: {:#?}", scope);
+    debug!("AST Scope: {:#?}", scope);
 }

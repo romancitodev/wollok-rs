@@ -50,6 +50,7 @@ pub struct Signature {
 pub struct ItemMethod {
     pub signature: Signature,
     pub body: Block,
+    pub inline: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -110,10 +111,11 @@ impl Display for ItemConst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{}{}{}",
+            "{}{}{}{}{}",
+            "(item) ".yellow(),
             "const ".magenta(),
             self.name.cyan(),
-            " = ".black(),
+            " = ".white(),
             self.expr
         )
     }
@@ -123,10 +125,11 @@ impl Display for ItemLet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{}{}{}",
-            "var ".magenta(),
+            "{}{}{}{}{}",
+            "(item) ".yellow(),
+            "let ".magenta(),
             self.name.cyan(),
-            " = ".black(),
+            " = ".white(),
             self.expr
         )
     }
@@ -136,10 +139,11 @@ impl Display for ItemProperty {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{}{}{}",
+            "{}{}{}{}{}",
+            "(item) ".yellow(),
             "property ".magenta(),
             self.name.cyan(),
-            " = ".black(),
+            " = ".white(),
             self.expr
         )
     }
@@ -167,7 +171,20 @@ impl Display for Signature {
 
 impl Display for ItemMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{} {}", "method ".magenta(), self.signature, self.body)
+        if self.inline {
+            write!(
+                f,
+                "{}{} = {}",
+                "method ".magenta(),
+                self.signature,
+                self.body
+                    .stmts
+                    .first()
+                    .expect("Method body should have at least one statement")
+            )
+        } else {
+            write!(f, "{}{} {}", "method ".magenta(), self.signature, self.body)
+        }
     }
 }
 
@@ -188,11 +205,11 @@ impl Display for ItemClass {
 impl Display for ItemObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", "object ".magenta(), self.name.cyan())?;
-        write!(f, " {{")?;
+        writeln!(f, " {{")?;
         for item in &self.body {
-            write!(f, " {item}; ")?;
+            writeln!(f, "\t {item}; ")?;
         }
-        write!(f, " }}")
+        writeln!(f, " }}")
     }
 }
 
@@ -227,10 +244,10 @@ impl Display for ItemProgram {
 impl Display for ItemPackage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", "package ".magenta(), self.name.cyan())?;
-        write!(f, " {{")?;
+        writeln!(f, " {{")?;
         for item in &self.body {
-            write!(f, " {}; ", item)?;
+            write!(f, " {item}; ")?;
         }
-        write!(f, " }}")
+        writeln!(f, " }}")
     }
 }

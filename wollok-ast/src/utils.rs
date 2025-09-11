@@ -40,13 +40,14 @@ macro_rules! items {
             body: vec![$($body),*],
         })
     };
-    (@method $name:expr, $params:expr, $body:expr) => {
+    (@method $name:expr, $params:expr, $body:expr, $inline:expr) => {
         $crate::item::Item::Method($crate::item::ItemMethod {
             signature: $crate::item::Signature {
                 ident: $name.to_owned(),
                 params: $params,
-            },
-            body: $crate::expr::Block { stmts: $body },
+              },
+              body: $crate::expr::Block { stmts: $body },
+              inline: $inline,
         })
     };
 }

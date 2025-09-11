@@ -2,11 +2,13 @@ use owo_colors::OwoColorize;
 use std::fmt::Display;
 
 use wollok_common::ast::{BinaryOp, UnaryOp};
-use wollok_lexer::{macros::lit, token::Literal};
+use wollok_lexer::token::Literal;
+
+use crate::ast::Stmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block {
-    pub stmts: Vec<Expr>,
+    pub stmts: Vec<Stmt>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -205,23 +207,23 @@ impl Display for Expr {
 
 impl Display for ExprArray {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        _ = write!(f, "{}", "[".green());
+        _ = write!(f, "[");
         for el in &self.elements {
             _ = write!(f, "{el}");
             _ = write!(f, ", ");
         }
-        write!(f, "{}", "]".green())
+        write!(f, "]")
     }
 }
 
 impl Display for ExprSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        _ = write!(f, "{}", "#{{".green());
+        _ = write!(f, "{{");
         for el in &self.elements {
             _ = write!(f, "{el}");
-            _ = write!(f, "{}", ", ".black());
+            _ = write!(f, ", ");
         }
-        write!(f, "{}", "#}}".green())
+        write!(f, "}}")
     }
 }
 
@@ -230,7 +232,7 @@ impl Display for ExprAssign {
         let lhs = self.left.as_ref();
         let rhs = self.right.as_ref();
         _ = write!(f, "{lhs}");
-        _ = write!(f, "{}", " = ".black());
+        _ = write!(f, " = ");
         write!(f, "{rhs}")
     }
 }
@@ -279,7 +281,7 @@ impl Display for ExprClosure {
 
 impl Display for ExprConst {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", "const ".magenta(), self.block)
+        write!(f, "{} = {}", "const ".magenta(), self.block)
     }
 }
 
@@ -294,6 +296,7 @@ impl Display for ExprField {
 
 impl Display for ExprClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}{}", "new ".magenta(), self.name.cyan())?;
         write!(f, "(")?;
         for (i, param) in self.params.iter().enumerate() {
@@ -308,6 +311,7 @@ impl Display for ExprClass {
 
 impl Display for ExprIf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}{}", "if ".magenta(), self.condition)?;
         write!(f, " {{ ... }}")?; // Simplified display for blocks
         if let Some(else_expr) = &self.otherwise {
@@ -321,10 +325,11 @@ impl Display for ExprLet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{}{}{}",
-            "var ".magenta(),
+            "{}{}{}{}{}",
+            "(expr)".yellow(),
+            "let ".magenta(),
             self.name.cyan(),
-            " = ".black(),
+            " = ".white(),
             self.value
         )
     }
@@ -346,6 +351,7 @@ impl Display for ExprLit {
 
 impl Display for ExprMethodCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}.{}", self.receiver, self.name.blue())?;
         write!(f, "(")?;
         for (i, arg) in self.args.iter().enumerate() {
@@ -360,6 +366,7 @@ impl Display for ExprMethodCall {
 
 impl Display for ExprObject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}", "object { ".magenta())?;
         for field in &self.fields {
             write!(f, "{field} ")?;
@@ -448,6 +455,7 @@ impl Display for ExprNew {
 
 impl Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}", "{ ".white())?;
         for stmt in &self.stmts {
             write!(f, "{stmt}; ")?;

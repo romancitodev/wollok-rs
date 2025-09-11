@@ -13,6 +13,7 @@ object pingüino { // hello
 
 		const hello = 1
 
+		a = 2
 
 
 

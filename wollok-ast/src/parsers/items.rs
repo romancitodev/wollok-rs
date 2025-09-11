@@ -53,10 +53,18 @@ impl Ast<'_> {
                 if self.consume(&T!(OpenBrace)) {
                     let body = self.parse_block();
                     self.expect_token(&T!(CloseBrace));
-                    Item::Method(ItemMethod { signature, body })
+                    Item::Method(ItemMethod {
+                        signature,
+                        body,
+                        inline: false,
+                    })
                 } else if self.consume(&T!(Equals)) {
                     let body = self.parse_inline_block();
-                    Item::Method(ItemMethod { signature, body })
+                    Item::Method(ItemMethod {
+                        signature,
+                        body,
+                        inline: true,
+                    })
                 } else {
                     self.error_in_place("Expected '{' or '=' after method signature");
                 }

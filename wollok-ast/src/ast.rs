@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use tracing::{debug, info, trace};
 
 use wollok_lexer::{
@@ -9,6 +11,16 @@ use crate::{expr::Expr, item::Item, source::Ast};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scope(pub Vec<Stmt>);
+
+impl Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Scope with {} statements", self.0.len())?;
+        for stmt in &self.0 {
+            writeln!(f, "{stmt}")?;
+        }
+        Ok(())
+    }
+}
 
 impl std::ops::Deref for Scope {
     type Target = Vec<Stmt>;
@@ -22,6 +34,15 @@ impl std::ops::Deref for Scope {
 pub enum Stmt {
     Item(Item),
     Expr(Expr),
+}
+
+impl Display for Stmt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Stmt::Item(item) => write!(f, "{item}"),
+            Stmt::Expr(expr) => write!(f, "{expr}"),
+        }
+    }
 }
 
 impl Scope {

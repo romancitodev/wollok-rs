@@ -49,8 +49,8 @@ fn test_object_with_assignment_in_method() {
         vec![stmt!(@item items!(@object "foo", [
           items!(@let "a", Box::new(exprs!(@lit 1))),
           items!(@method "do", vec![], vec![
-            exprs!(@assign exprs!(@field "a", exprs!(@self)), exprs!(@lit 2))
-          ])
+            stmt!(@expr exprs!(@assign exprs!(@field "a", exprs!(@self)), exprs!(@lit 2)))
+          ], false)
         ]))]
     );
 }
@@ -96,8 +96,8 @@ fn test_method_signature_parsing() {
             ident!("a"),
             ident!("b"),
           ], vec![
-            exprs!(@lit 42)
-          ])
+             stmt!(@expr exprs!(@lit 42))
+          ], true)
         ]))],
     );
 }
@@ -561,28 +561,13 @@ fn test_complex_assignment_in_method() {
         }";
     let scope = parse(input);
 
-    if let [Stmt::Item(Item::Object(obj))] = scope.as_slice() {
-        assert_eq!(obj.name, "manager");
-        assert_eq!(obj.body.len(), 2);
-
-        if let [Item::Let(_), Item::Method(method)] = obj.body.as_slice() {
-            assert_eq!(method.signature.ident, "updateData");
-            assert_eq!(method.body.stmts.len(), 1);
-
-            // Verify the assignment is to an array
-            if let Expr::Assign(assign) = &method.body.stmts[0] {
-                if let Expr::Array(_) = assign.right.as_ref() {
-                    // Good, assignment to array
-                } else {
-                    panic!("Expected assignment to array");
-                }
-            } else {
-                panic!("Expected assignment expression");
-            }
-        } else {
-            panic!("Expected let and method items");
-        }
-    } else {
-        panic!("Expected object statement");
-    }
+    assert_eq!(
+        *scope,
+        vec![stmt!(@item items!(@object "manager", [
+            items!(@let "data", exprs!(@array []).into()),
+            items!(@method "updateData", vec![], vec![
+                stmt!(@expr exprs!(@assign exprs!(@field "data", exprs!(@self)), exprs!(@array [exprs!(@lit 1), exprs!(@lit 2), exprs!(@lit 3)])))
+            ], false)
+        ]))],
+    );
 }
