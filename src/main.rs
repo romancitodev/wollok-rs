@@ -1,3 +1,9 @@
+use std::{
+    env,
+    fs::{File, read_to_string},
+    io::{self, Error, Read},
+};
+
 use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use wollok_ast::ast::Scope;
@@ -14,13 +20,23 @@ fn init_tracing() {
         .init();
 }
 
-fn main() {
+fn args() -> Vec<String> {
+    env::args().collect()
+}
+
+fn main() -> io::Result<()> {
     init_tracing();
-    let base = include_str!("../example.wlk");
-    let tokens = TokenStream::new(base);
-    let scope = Scope::from_tokens(base, tokens);
+    let [_, ref file] = args()[..] else {
+        return Err(Error::new(io::ErrorKind::InvalidInput, "File input needed"));
+    };
+    let path = read_to_string(file)?;
+
+    let tokens = TokenStream::new(&path);
+    let scope = Scope::from_tokens(&path, tokens);
 
     println!("{scope}");
 
     debug!("AST Scope: {:#?}", scope);
+
+    Ok(())
 }

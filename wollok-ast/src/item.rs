@@ -56,7 +56,7 @@ pub struct ItemMethod {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemClass {
     pub name: String,
-    pub superclass: Option<String>,
+    pub superclass: Option<Vec<String>>,
     pub body: Vec<Item>,
 }
 
@@ -192,9 +192,12 @@ impl Display for ItemClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", "class ".magenta(), self.name.cyan())?;
         if let Some(superclass) = &self.superclass {
-            write!(f, "{}{}", " inherits ".magenta(), superclass.cyan())?;
+            write!(f, "{}", " inherits ".magenta())?;
+            for class in superclass {
+                write!(f, "{}, ", class.cyan())?;
+            }
         }
-        write!(f, " {{")?;
+        write!(f, "{{")?;
         for item in &self.body {
             write!(f, " {item}; ")?;
         }

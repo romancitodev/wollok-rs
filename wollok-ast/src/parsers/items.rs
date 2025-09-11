@@ -11,7 +11,7 @@ use wollok_lexer::macros::{T, kw};
 use crate::{
     ast::Stmt,
     expr::Expr,
-    item::{Item, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
+    item::{Item, ItemClass, ItemConst, ItemLet, ItemMethod, ItemObject, ItemProperty, Signature},
     source::Ast,
 };
 
@@ -106,6 +106,45 @@ impl Ast<'_> {
     }
 
     /// Parses an object declaration with its body
+    pub(crate) fn parse_class(&mut self) -> Stmt {
+        trace!("Starting class parsing");
+        let name = self.expect_match("Expected class identifier", |t| t.into_ident()); // Here we should expect the object ident.
+        let mut superclass = Vec::new();
+        debug!("Parsing class '{}'", name);
+        if self.consume(&kw!(Inherits)) {
+            debug!("parsing inherits");
+            let first_name =
+                self.expect_match("Expected superclass identifier", |t| t.into_ident());
+            superclass.push(first_name);
+
+            while self.consume(&T!(Comma)) {
+                if self.check(&T!(OpenBrace)) {
+                    let (span, _) = self.advance().unwrap().split();
+                    self.error_at(span, "Expected superclass identifer, got , instead");
+                }
+                let name = self.expect_match("Expected superclass identifier", |t| t.into_ident());
+                superclass.push(name);
+            }
+        }
+        self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
+        self.skip_trivia();
+        let body = self.parse_class_body();
+        self.expect_token(&T!(CloseBrace)); // Here we should expect the `}`
+        self.skip_trivia();
+        info!(
+            "Successfully parsed class '{}' with {} items",
+            name,
+            body.len()
+        );
+
+        Stmt::Item(Item::Class(ItemClass {
+            name,
+            body,
+            superclass: (!superclass.is_empty()).then_some(superclass),
+        }))
+    }
+
+    /// Parses an object declaration with its body
     pub(crate) fn parse_object(&mut self) -> Stmt {
         trace!("Starting object parsing");
         let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
@@ -126,6 +165,29 @@ impl Ast<'_> {
 
     /// Parses the body of an object (its properties, methods, etc.)
     pub(crate) fn parse_object_body(&mut self) -> Vec<Item> {
+        let mut body = Vec::new();
+
+        loop {
+            // Skip newlines
+            if self.consume(&T!(Newline)) {
+                continue;
+            }
+
+            // Check for end of object
+            if self.check(&T!(CloseBrace)) {
+                break;
+            }
+
+            // Parse item
+            let stmt = self.parse_item();
+            Self::push_to_node(stmt, &mut body);
+        }
+
+        body
+    }
+
+    /// Parses the body of a class (very similar to `parse_object_body`) (its properties, methods, etc.)
+    pub(crate) fn parse_class_body(&mut self) -> Vec<Item> {
         let mut body = Vec::new();
 
         loop {

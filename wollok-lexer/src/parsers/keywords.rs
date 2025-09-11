@@ -27,6 +27,9 @@ impl TokenParser for KeywordParser {
             "super".value(Keyword::Super),
             "return".value(Keyword::Return),
             "new".value(Keyword::New),
+            "inherits".value(Keyword::Inherits),
+            "override".value(Keyword::Override),
+            "fallible".value(Keyword::Fallible),
         ))
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))

@@ -20,6 +20,14 @@ object pingüino { // hello
 	}
 }
 
+class Pepe {
+	let age = 18
+}
+
+class Moto inherits Vehiculo {
+	method run() = 0
+}
+
 const ñandú = [[]]
 
 const libro = new Libro()

@@ -244,6 +244,7 @@ pub enum Keyword {
     Override,
     Mixin,
     Inherits,
+    Fallible,
 }
 
 impl fmt::Display for Keyword {
@@ -268,6 +269,7 @@ impl fmt::Display for Keyword {
             Keyword::Override => "override",
             Keyword::Mixin => "mixin",
             Keyword::Inherits => "inherits",
+            Keyword::Fallible => "fallible",
         };
         write!(f, "{keyword}")
     }
