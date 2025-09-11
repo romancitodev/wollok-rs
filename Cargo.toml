@@ -8,6 +8,7 @@ members = ["wollok-*"]
 
 [workspace.dependencies]
 ariadne = { version = "0.5.1", features = ["auto-color"] }
+owo-colors = "4.2.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-log = "0.2"
@@ -15,5 +16,7 @@ tracing-log = "0.2"
 [dependencies]
 wollok-ast.path = "./wollok-ast"
 wollok-lexer.path = "./wollok-lexer"
+wollok-common.path = "./wollok-common"
 tracing-subscriber.workspace = true
 tracing.workspace = true
+owo-colors.workspace = true

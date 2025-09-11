@@ -12,7 +12,7 @@ use wollok_lexer::{
 };
 
 use crate::{
-    expr::{Expr, ExprAssign, ExprBinary, ExprField, ExprLit},
+    expr::{Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprLit},
     source::Ast,
 };
 
@@ -41,8 +41,53 @@ impl Ast<'_> {
 
     /// Parses primary expressions (literals, identifiers, collections, etc.)
     pub(crate) fn parse_primary_expr(&mut self) -> Expr {
-        let expr = self.parse_atomic_expr();
+        let expr = self.parse_postfix_expr();
         self.parse_binary_expr(expr, 0)
+    }
+
+    /// Parses postfix expressions (function calls, field access, etc.)
+    /// Only allows calls on callable expressions (identifiers, field access, parentheses)
+    pub(crate) fn parse_postfix_expr(&mut self) -> Expr {
+        let mut expr = self.parse_atomic_expr();
+
+        loop {
+            if self.check(&T!(OpenParen)) && Self::is_callable(&expr) {
+                // Function call: expr() - but only if expr is callable
+                let args = self.parse_params();
+                expr = Expr::Call(ExprCall {
+                    callee: Box::new(expr),
+                    args,
+                });
+            } else if self.check(&T!(Dot)) {
+                // Field access: expr.field
+                self.advance(); // consume the dot
+                let field_name = self.expect_match("Expected field name", |t| t.into_ident());
+                expr = Expr::Field(ExprField {
+                    name: field_name,
+                    base: Box::new(expr),
+                });
+            } else {
+                // No more postfix operations
+                break;
+            }
+        }
+
+        expr
+    }
+
+    /// Determines if an expression can be called (i.e., can have () after it)
+    fn is_callable(expr: &Expr) -> bool {
+        matches!(
+            expr,
+            // Identifiers can be called: foo()
+            Expr::Field(_) |
+            // Method calls can be chained: obj.method1().method2()
+            Expr::Call(_) |
+            // Object instantiation can be called: new Foo().method()
+            Expr::Class(_) |
+            // Self can be called: self()
+            Expr::Self_
+        )
     }
 
     /// Parses atomic expressions without binary operations
@@ -78,7 +123,7 @@ impl Ast<'_> {
 
             self.advance(); // consume operator
             let next_prec = if right_assoc { prec } else { prec + 1 };
-            let rhs_atomic = self.parse_atomic_expr();
+            let rhs_atomic = self.parse_postfix_expr();
             let rhs = self.parse_binary_expr(rhs_atomic, next_prec);
 
             lhs = Expr::Binary(ExprBinary {
@@ -90,7 +135,7 @@ impl Ast<'_> {
         lhs
     }
 
-    /// Peek at the next operator, returning (BinaryOp, precedence, is_right_assoc)
+    /// Peek at the next operator, returning (`BinaryOp`, precedence)
     fn peek_operator(&mut self) -> Option<(BinaryOp, u8, bool)> {
         self.peek().and_then(|peeked| {
             let token = &peeked.token.token;

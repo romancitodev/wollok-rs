@@ -4,6 +4,8 @@ object pingüino { // hello
 	const me = 1
 	property job = "Rust" // hello
 
+	property pepe = foo()
+
 	method job() = job
 	method do() = 2
 	method do(a) {

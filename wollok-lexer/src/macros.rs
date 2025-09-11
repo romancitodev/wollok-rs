@@ -35,6 +35,9 @@ macro_rules! lit {
     ($i:expr) => {
         $crate::token::Token::Literal(Into::<$crate::token::Literal>::into($i))
     };
+    (@match $i:tt) => {
+        $crate::token::Token::Literal($i)
+    };
 }
 
 #[doc(inline)]

@@ -1,4 +1,6 @@
 use crate::expr::{Block, Expr};
+use owo_colors::OwoColorize;
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -85,4 +87,150 @@ pub struct ItemProgram {
 pub struct ItemPackage {
     pub name: String,
     pub body: Vec<Item>,
+}
+
+impl Display for Item {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Item::Const(item) => write!(f, "{item}"),
+            Item::Let(item) => write!(f, "{item}"),
+            Item::Property(item) => write!(f, "{item}"),
+            Item::Method(item) => write!(f, "{item}"),
+            Item::Class(item) => write!(f, "{item}"),
+            Item::Object(item) => write!(f, "{item}"),
+            Item::Import(item) => write!(f, "{item}"),
+            Item::Test(item) => write!(f, "{item}"),
+            Item::Program(item) => write!(f, "{item}"),
+            Item::Package(item) => write!(f, "{item}"),
+        }
+    }
+}
+
+impl Display for ItemConst {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}{}{}",
+            "const ".magenta(),
+            self.name.cyan(),
+            " = ".black(),
+            self.expr
+        )
+    }
+}
+
+impl Display for ItemLet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}{}{}",
+            "var ".magenta(),
+            self.name.cyan(),
+            " = ".black(),
+            self.expr
+        )
+    }
+}
+
+impl Display for ItemProperty {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}{}{}",
+            "property ".magenta(),
+            self.name.cyan(),
+            " = ".black(),
+            self.expr
+        )
+    }
+}
+
+impl Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name.cyan())
+    }
+}
+
+impl Display for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.ident.blue())?;
+        write!(f, "(")?;
+        for (i, param) in self.params.iter().enumerate() {
+            write!(f, "{param}")?;
+            if i < self.params.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")
+    }
+}
+
+impl Display for ItemMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{} {}", "method ".magenta(), self.signature, self.body)
+    }
+}
+
+impl Display for ItemClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", "class ".magenta(), self.name.cyan())?;
+        if let Some(superclass) = &self.superclass {
+            write!(f, "{}{}", " inherits ".magenta(), superclass.cyan())?;
+        }
+        write!(f, " {{")?;
+        for item in &self.body {
+            write!(f, " {item}; ")?;
+        }
+        write!(f, " }}")
+    }
+}
+
+impl Display for ItemObject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", "object ".magenta(), self.name.cyan())?;
+        write!(f, " {{")?;
+        for item in &self.body {
+            write!(f, " {item}; ")?;
+        }
+        write!(f, " }}")
+    }
+}
+
+impl Display for ItemImport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", "import ".magenta(), self.module.cyan())?;
+        if self.wildcard {
+            write!(f, ".*")?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for ItemTest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{} {}", "test ".magenta(), self.name.cyan(), self.body)
+    }
+}
+
+impl Display for ItemProgram {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{} {}",
+            "program ".magenta(),
+            self.name.cyan(),
+            self.body
+        )
+    }
+}
+
+impl Display for ItemPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", "package ".magenta(), self.name.cyan())?;
+        write!(f, " {{")?;
+        for item in &self.body {
+            write!(f, " {}; ", item)?;
+        }
+        write!(f, " }}")
+    }
 }

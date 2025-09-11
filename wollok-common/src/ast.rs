@@ -1,3 +1,4 @@
+use owo_colors::OwoColorize;
 use std::fmt;
 use wollok_lexer::token::Literal;
 
@@ -72,23 +73,29 @@ impl From<bool> for Expr {
 
 impl fmt::Display for BinaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BinaryOp::Eq => write!(f, "=="),
-            BinaryOp::Ne => write!(f, "!="),
-            BinaryOp::And => write!(f, "&&"),
-            BinaryOp::Or => write!(f, "||"),
-            BinaryOp::Plus => write!(f, "+"),
-            BinaryOp::Minus => write!(f, "-"),
-            BinaryOp::Multiply => write!(f, "*"),
-            BinaryOp::Div => write!(f, "/"),
+        let op = match self {
+            BinaryOp::Eq => "==",
+            BinaryOp::Ne => "!=",
+            BinaryOp::And => "&&",
+            BinaryOp::Or => "||",
+            BinaryOp::Plus => "+",
+            BinaryOp::Minus => "-",
+            BinaryOp::Multiply => "*",
+            BinaryOp::Div => "/",
         }
+        .bright_red()
+        .to_string();
+        write!(f, "{op}")
     }
 }
 
 impl fmt::Display for UnaryOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            UnaryOp::Not => write!(f, "!"),
+        let op = match self {
+            UnaryOp::Not => "!",
         }
+        .bright_red()
+        .to_string();
+        write!(f, "{op}")
     }
 }

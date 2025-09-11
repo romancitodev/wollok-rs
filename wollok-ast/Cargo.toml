@@ -8,3 +8,4 @@ wollok-lexer.path = "../wollok-lexer"
 wollok-common.path = "../wollok-common"
 ariadne.workspace = true
 tracing.workspace = true
+owo-colors.workspace = true

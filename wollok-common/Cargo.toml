@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 wollok-lexer.path = "../wollok-lexer"
 tracing.workspace = true
+owo-colors.workspace = true
