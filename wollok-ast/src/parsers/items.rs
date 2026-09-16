@@ -6,13 +6,16 @@
 /// - Property declarations
 /// - Const and let declarations
 use tracing::{debug, info, trace, warn};
-use wollok_lexer::macros::{T, kw};
+use wollok_lexer::{
+    macros::{T, kw},
+    token::Token,
+};
 
 use crate::{
     ast::Stmt,
     expr::Expr,
     item::{
-        Item, ItemClass, ItemConst, ItemImport, ItemLet, ItemMethod, ItemObject,
+        Item, ItemClass, ItemConst, ItemImport, ItemLet, ItemMethod, ItemMixin, ItemObject,
         ItemPrefixedMethod, ItemProperty, Prefix, Signature,
     },
     source::Ast,
@@ -168,27 +171,30 @@ impl Ast<'_> {
         Stmt::Item(Item::Import(ItemImport { module, wildcard }))
     }
 
+    /// Parses `keyword name, name, ...`, e.g. `inherits A, B` or
+    /// `with M, N`. Returns `None` if `keyword` isn't there at all.
+    fn parse_name_list_after(&mut self, keyword: &Token) -> Option<Vec<String>> {
+        if !self.consume(keyword) {
+            return None;
+        }
+        let mut names = vec![self.expect_match("Expected identifier", |t| t.into_ident())];
+        while self.consume(&T!(Comma)) {
+            if self.check(&T!(OpenBrace)) {
+                let (span, _) = self.advance().unwrap().split();
+                self.error_at(span, "Expected identifer, got , instead");
+            }
+            names.push(self.expect_match("Expected identifier", |t| t.into_ident()));
+        }
+        Some(names)
+    }
+
     /// Parses a class declaration with its body
     pub(crate) fn parse_class(&mut self, is_abstract: bool) -> Stmt {
         trace!("Starting class parsing");
         let name = self.expect_match("Expected class identifier", |t| t.into_ident()); // Here we should expect the object ident.
-        let mut superclass = Vec::new();
         debug!("Parsing class '{}'", name);
-        if self.consume(&kw!(Inherits)) {
-            debug!("parsing inherits");
-            let first_name =
-                self.expect_match("Expected superclass identifier", |t| t.into_ident());
-            superclass.push(first_name);
-
-            while self.consume(&T!(Comma)) {
-                if self.check(&T!(OpenBrace)) {
-                    let (span, _) = self.advance().unwrap().split();
-                    self.error_at(span, "Expected superclass identifer, got , instead");
-                }
-                let name = self.expect_match("Expected superclass identifier", |t| t.into_ident());
-                superclass.push(name);
-            }
-        }
+        let superclass = self.parse_name_list_after(&kw!(Inherits));
+        let mixins = self.parse_name_list_after(&kw!(With));
         self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
         self.skip_trivia();
         let body = self.parse_class_body();
@@ -203,7 +209,8 @@ impl Ast<'_> {
         Stmt::Item(Item::Class(ItemClass {
             name,
             body,
-            superclass: (!superclass.is_empty()).then_some(superclass),
+            superclass,
+            mixins,
             is_abstract,
         }))
     }
@@ -225,6 +232,21 @@ impl Ast<'_> {
         );
 
         Stmt::Item(Item::Object(ItemObject { name, body }))
+    }
+
+    /// Parses a mixin declaration with its body (methods, including
+    /// abstract ones — a mixin body parses like a class body).
+    pub(crate) fn parse_mixin(&mut self) -> Stmt {
+        trace!("Starting mixin parsing");
+        let name = self.expect_match("Expected mixin identifier", |t| t.into_ident());
+        self.expect_token(&T!(OpenBrace));
+        self.skip_trivia();
+        let body = self.parse_class_body();
+        self.expect_token(&T!(CloseBrace));
+        self.skip_trivia();
+        info!("Successfully parsed mixin '{}' with {} items", name, body.len());
+
+        Stmt::Item(Item::Mixin(ItemMixin { name, body }))
     }
 
     /// Parses the body of an object (its properties, methods, etc.)

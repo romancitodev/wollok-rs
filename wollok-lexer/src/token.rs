@@ -262,6 +262,7 @@ pub enum Keyword {
     Fallible,
     Try,
     Abstract,
+    With,
 }
 
 impl fmt::Display for Keyword {
@@ -289,6 +290,7 @@ impl fmt::Display for Keyword {
             Keyword::Fallible => "fallible",
             Keyword::Try => "try",
             Keyword::Abstract => "abstract",
+            Keyword::With => "with",
         };
         write!(f, "{keyword}")
     }

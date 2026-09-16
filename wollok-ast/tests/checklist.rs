@@ -125,7 +125,7 @@ fn imports() {
 }
 
 #[test]
-#[ignore = "mixins not implemented yet"]
 fn mixins() {
     parse("mixin Volador { method volar() = \"volando\" }");
+    parse("class Persona with Volador, Nadador { }");
 }

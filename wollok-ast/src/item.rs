@@ -12,6 +12,7 @@ pub enum Item {
     PrefixedMethod(ItemPrefixedMethod),
     Class(ItemClass),
     Object(ItemObject),
+    Mixin(ItemMixin),
     Import(ItemImport),
     Test(ItemTest),
     Program(ItemProgram),
@@ -73,12 +74,19 @@ pub struct ItemPrefixedMethod {
 pub struct ItemClass {
     pub name: String,
     pub superclass: Option<Vec<String>>,
+    pub mixins: Option<Vec<String>>,
     pub body: Vec<Item>,
     pub is_abstract: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemObject {
+    pub name: String,
+    pub body: Vec<Item>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ItemMixin {
     pub name: String,
     pub body: Vec<Item>,
 }
@@ -116,6 +124,7 @@ impl Display for Item {
             Item::Method(item) => write!(f, "{item}"),
             Item::Class(item) => write!(f, "{item}"),
             Item::Object(item) => write!(f, "{item}"),
+            Item::Mixin(item) => write!(f, "{item}"),
             Item::Import(item) => write!(f, "{item}"),
             Item::Test(item) => write!(f, "{item}"),
             Item::Program(item) => write!(f, "{item}"),
@@ -216,11 +225,28 @@ impl Display for ItemClass {
                 write!(f, "{}, ", class.cyan())?;
             }
         }
+        if let Some(mixins) = &self.mixins {
+            write!(f, "{}", " with ".magenta())?;
+            for mixin in mixins {
+                write!(f, "{}, ", mixin.cyan())?;
+            }
+        }
         write!(f, "{{")?;
         for item in &self.body {
             write!(f, " {item}; ")?;
         }
         write!(f, " }}")
+    }
+}
+
+impl Display for ItemMixin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", "mixin ".magenta(), self.name.cyan())?;
+        writeln!(f, " {{")?;
+        for item in &self.body {
+            writeln!(f, "\t {item}; ")?;
+        }
+        writeln!(f, " }}")
     }
 }
 

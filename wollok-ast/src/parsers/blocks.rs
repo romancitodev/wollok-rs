@@ -69,6 +69,7 @@ impl Ast<'_> {
                 self.parse_class(true)
             }
             kw!(Import) => self.parse_import(),
+            kw!(Mixin) => self.parse_mixin(),
             Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
                 token.recover();
                 Stmt::Item(self.parse_item())

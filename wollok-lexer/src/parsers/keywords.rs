@@ -26,7 +26,7 @@ pub struct KeywordParser;
 
 impl TokenParser for KeywordParser {
     fn parse<'t>(input: &mut Src<'t>) -> Result<'t, Option<SpannedToken>> {
-        let result = alt((
+        let result = alt([
             keyword("if").value(Keyword::If),
             keyword("else").value(Keyword::Else),
             keyword("object").value(Keyword::Object),
@@ -48,7 +48,9 @@ impl TokenParser for KeywordParser {
             keyword("fallible").value(Keyword::Fallible),
             keyword("try").value(Keyword::Try),
             keyword("abstract").value(Keyword::Abstract),
-        ))
+            keyword("mixin").value(Keyword::Mixin),
+            keyword("with").value(Keyword::With),
+        ])
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))
         .parse_next(input)?;
