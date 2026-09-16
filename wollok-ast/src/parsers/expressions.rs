@@ -15,7 +15,7 @@ use crate::{
     ast::Stmt,
     expr::{
         Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprClosure, ExprField, ExprIf, ExprLit,
-        ExprReturn, ExprUnary,
+        ExprReturn, ExprTry, ExprUnary,
     },
     source::Ast,
 };
@@ -135,6 +135,9 @@ impl Ast<'_> {
             kw!(This) => Expr::Self_,
             kw!(Super) => Expr::Super_,
             kw!(If) => self.parse_if_expr(),
+            kw!(Try) => Expr::Try(ExprTry {
+                expr: Box::new(self.parse_expr()),
+            }),
             kw!(Return) => {
                 let value = (!self.check(&T!(Newline)) && !self.check(&T!(CloseBrace)))
                     .then(|| Box::new(self.parse_expr()));
