@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace]
-members = ["wollok-*"]
+members = ["crates/*"]
 
 [workspace.dependencies]
 ariadne = { version = "0.5.1", features = ["auto-color"] }
@@ -14,9 +14,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-log = "0.2"
 
 [dependencies]
-wollok-ast.path = "./wollok-ast"
-wollok-lexer.path = "./wollok-lexer"
-wollok-common.path = "./wollok-common"
+wollok-ast.path = "./crates/wollok-ast"
+wollok-lexer.path = "./crates/wollok-lexer"
+wollok-common.path = "./crates/wollok-common"
 tracing-subscriber.workspace = true
 tracing.workspace = true
 owo-colors.workspace = true
