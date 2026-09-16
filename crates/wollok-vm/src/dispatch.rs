@@ -88,4 +88,68 @@ mod tests {
         assert_eq!(table.get(a).lookup(ClassId(1)), Some(MethodRef(7)));
         assert_eq!(table.get(b).lookup(ClassId(1)), None);
     }
+
+    #[test]
+    fn a_fresh_cache_has_no_entry() {
+        let cache = InlineCache::default();
+        assert_eq!(cache.lookup(ClassId(1)), None);
+        assert_eq!(cache.lookup(ClassId(2)), None);
+    }
+
+    #[test]
+    fn monomorphic_cache_is_overwritten_by_the_latest_class_only() {
+        // Today's cache is strictly monomorphic: a polymorphic call-site
+        // (receiver class changes between calls) doesn't grow the cache,
+        // it just replaces the entry. Locking this in explicitly because
+        // it's exactly the behavior a future polymorphic cache would
+        // change on purpose.
+        let mut cache = InlineCache::default();
+        cache.store(ClassId(1), MethodRef(1));
+        assert_eq!(cache.lookup(ClassId(1)), Some(MethodRef(1)));
+
+        cache.store(ClassId(2), MethodRef(2));
+        assert_eq!(
+            cache.lookup(ClassId(1)),
+            None,
+            "storing a new class must evict the old one in a monomorphic cache"
+        );
+        assert_eq!(cache.lookup(ClassId(2)), Some(MethodRef(2)));
+    }
+
+    #[test]
+    fn storing_the_same_class_again_updates_the_method() {
+        // Covers redefinition/relinking: same class, resolved method
+        // changes (e.g. the method got recompiled).
+        let mut cache = InlineCache::default();
+        cache.store(ClassId(1), MethodRef(1));
+        cache.store(ClassId(1), MethodRef(2));
+        assert_eq!(cache.lookup(ClassId(1)), Some(MethodRef(2)));
+    }
+
+    #[test]
+    fn reserved_slots_are_assigned_in_order() {
+        let mut table = InlineCacheTable::default();
+        let slots: Vec<_> = (0..5).map(|_| table.reserve_slot()).collect();
+        let indices: Vec<u32> = slots.iter().map(|s| s.0).collect();
+        assert_eq!(indices, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn mutating_one_slot_never_touches_another() {
+        let mut table = InlineCacheTable::default();
+        let a = table.reserve_slot();
+        let b = table.reserve_slot();
+        let c = table.reserve_slot();
+
+        table.get_mut(a).store(ClassId(1), MethodRef(10));
+        table.get_mut(c).store(ClassId(2), MethodRef(30));
+
+        assert_eq!(table.get(a).lookup(ClassId(1)), Some(MethodRef(10)));
+        assert_eq!(
+            table.get(b).lookup(ClassId(1)),
+            None,
+            "b was never stored into"
+        );
+        assert_eq!(table.get(c).lookup(ClassId(2)), Some(MethodRef(30)));
+    }
 }

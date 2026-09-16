@@ -95,4 +95,67 @@ mod tests {
         assert_eq!(v.as_object(), None);
         assert!(!v.is_null());
     }
+
+    #[test]
+    fn every_variant_only_answers_its_own_accessor() {
+        let bool_v = Value::from(false);
+        assert_eq!(bool_v.as_bool(), Some(false));
+        assert_eq!(bool_v.as_int(), None);
+        assert_eq!(bool_v.as_float(), None);
+        assert_eq!(bool_v.as_object(), None);
+
+        let float_v = Value::from(1.0f64);
+        assert_eq!(float_v.as_float(), Some(1.0));
+        assert_eq!(float_v.as_int(), None);
+        assert_eq!(float_v.as_bool(), None);
+        assert_eq!(float_v.as_object(), None);
+
+        assert_eq!(Value::Null.as_bool(), None);
+        assert_eq!(Value::Null.as_int(), None);
+        assert_eq!(Value::Null.as_float(), None);
+        assert_eq!(Value::Null.as_object(), None);
+    }
+
+    #[test]
+    fn int_and_float_are_distinct_variants_even_when_numerically_equal() {
+        // 1 (Int) and 1.0 (Float) must NOT compare equal: Wollok
+        // distinguishes them, so the VM can't let Rust's numeric
+        // coercion blur that at the Value level.
+        assert_ne!(Value::from(1i64), Value::from(1.0f64));
+    }
+
+    #[test]
+    fn same_variant_same_payload_is_equal() {
+        assert_eq!(Value::from(7i64), Value::from(7i64));
+        assert_eq!(Value::from(2.5f64), Value::from(2.5f64));
+        assert_eq!(Value::from(true), Value::from(true));
+        assert_eq!(Value::Null, Value::Null);
+        assert_ne!(Value::from(7i64), Value::from(8i64));
+        assert_ne!(Value::from(true), Value::from(false));
+    }
+
+    #[test]
+    fn negative_and_zero_ints_round_trip() {
+        assert_eq!(Value::from(0i64).as_int(), Some(0));
+        assert_eq!(Value::from(-1i64).as_int(), Some(-1));
+        assert_eq!(Value::from(i64::MIN).as_int(), Some(i64::MIN));
+        assert_eq!(Value::from(i64::MAX).as_int(), Some(i64::MAX));
+    }
+
+    #[test]
+    fn object_variant_round_trips_the_exact_ref() {
+        use crate::heap::{ClassId, Heap};
+        let mut heap = Heap::new();
+        let obj = heap.alloc(ClassId(0), vec![]);
+        let v = Value::from(obj);
+        assert_eq!(v.as_object(), Some(obj));
+    }
+
+    #[test]
+    fn value_is_copy_and_independent_after_copying() {
+        let a = Value::from(1i64);
+        let b = a; // Copy, not a move
+        assert_eq!(a, b);
+        assert_eq!(a.as_int(), Some(1));
+    }
 }
