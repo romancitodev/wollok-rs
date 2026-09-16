@@ -119,9 +119,9 @@ fn block_comments() {
 }
 
 #[test]
-#[ignore = "imports not implemented yet"]
 fn imports() {
     parse("import trenes.*");
+    parse("import a.b.c");
 }
 
 #[test]

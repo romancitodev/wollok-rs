@@ -68,6 +68,7 @@ impl Ast<'_> {
                 self.expect_token(&kw!(Class));
                 self.parse_class(true)
             }
+            kw!(Import) => self.parse_import(),
             Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
                 token.recover();
                 Stmt::Item(self.parse_item())

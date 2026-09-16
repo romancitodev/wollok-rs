@@ -12,8 +12,8 @@ use crate::{
     ast::Stmt,
     expr::Expr,
     item::{
-        Item, ItemClass, ItemConst, ItemLet, ItemMethod, ItemObject, ItemPrefixedMethod,
-        ItemProperty, Prefix, Signature,
+        Item, ItemClass, ItemConst, ItemImport, ItemLet, ItemMethod, ItemObject,
+        ItemPrefixedMethod, ItemProperty, Prefix, Signature,
     },
     source::Ast,
 };
@@ -149,6 +149,23 @@ impl Ast<'_> {
         let params = self.parse_separated_list(Ast::parse_expr, &T!(Comma), &T!(CloseParen));
         trace!("Parsed {} parameters", params.len());
         params
+    }
+
+    pub(crate) fn parse_import(&mut self) -> Stmt {
+        let mut module = self.expect_match("Expected module name", |t| t.into_ident());
+        let mut wildcard = false;
+
+        while self.consume(&T!(Dot)) {
+            if self.consume(&T!(Multiply)) {
+                wildcard = true;
+                break;
+            }
+            let part = self.expect_match("Expected module path segment", |t| t.into_ident());
+            module.push('.');
+            module.push_str(&part);
+        }
+
+        Stmt::Item(Item::Import(ItemImport { module, wildcard }))
     }
 
     /// Parses a class declaration with its body
