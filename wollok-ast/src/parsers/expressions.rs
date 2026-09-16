@@ -14,8 +14,8 @@ use wollok_lexer::{
 use crate::{
     ast::Stmt,
     expr::{
-        Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprClosure, ExprField, ExprIf, ExprLit,
-        ExprReturn, ExprTry, ExprUnary,
+        Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprCatch, ExprClosure, ExprField, ExprIf,
+        ExprLit, ExprReturn, ExprTry, ExprTryBlock, ExprUnary,
     },
     source::Ast,
 };
@@ -132,9 +132,24 @@ impl Ast<'_> {
             kw!(This) => Expr::Self_,
             kw!(Super) => Expr::Super_,
             kw!(If) => self.parse_if_expr(),
-            kw!(Try) => Expr::Try(ExprTry {
-                expr: Box::new(self.parse_expr()),
-            }),
+            kw!(Try) => {
+                if self.consume(&T!(OpenBrace)) {
+                    let block = self.parse_block();
+                    self.expect_token(&T!(CloseBrace));
+                    let catch = self.consume(&kw!(Catch)).then(|| {
+                        let param = self.expect_match("Expected catch parameter", |t| t.into_ident());
+                        self.expect_token(&T!(OpenBrace));
+                        let block = self.parse_block();
+                        self.expect_token(&T!(CloseBrace));
+                        ExprCatch { param, block }
+                    });
+                    Expr::TryBlock(ExprTryBlock { block, catch })
+                } else {
+                    Expr::Try(ExprTry {
+                        expr: Box::new(self.parse_expr()),
+                    })
+                }
+            }
             kw!(Return) => {
                 let value = (!self.check(&T!(Newline)) && !self.check(&T!(CloseBrace)))
                     .then(|| Box::new(self.parse_expr()));

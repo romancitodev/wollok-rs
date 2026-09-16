@@ -90,6 +90,19 @@ fn if_else_if_chain_with_blocks() {
 #[test]
 fn try_expression() {
     parse("const resultado = try operacionRiesgosa()");
+    parse(
+        r"const resultado = try {
+            const x = operacionRiesgosa()
+            x + 1
+        }",
+    );
+    parse(
+        r"const resultado = try {
+            operacionRiesgosa()
+        } catch e {
+            0
+        }",
+    );
 }
 
 #[test]

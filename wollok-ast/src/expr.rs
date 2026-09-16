@@ -137,6 +137,13 @@ pub struct ExprTry {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprTryBlock {
     pub block: Block,
+    pub catch: Option<ExprCatch>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExprCatch {
+    pub param: String,
+    pub block: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -394,7 +401,17 @@ impl Display for ExprTry {
 
 impl Display for ExprTryBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "try { ... }".magenta()) // Simplified display for blocks
+        write!(f, "{}{}", "try ".magenta(), self.block)?;
+        if let Some(catch) = &self.catch {
+            write!(
+                f,
+                "{}{} {}",
+                " catch ".magenta(),
+                catch.param.cyan(),
+                catch.block
+            )?;
+        }
+        Ok(())
     }
 }
 
