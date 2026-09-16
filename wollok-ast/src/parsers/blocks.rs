@@ -63,7 +63,11 @@ impl Ast<'_> {
         let token = self.peek_expect();
         match **token {
             kw!(Object) => self.parse_object(),
-            kw!(Class) => self.parse_class(),
+            kw!(Class) => self.parse_class(false),
+            kw!(Abstract) => {
+                self.expect_token(&kw!(Class));
+                self.parse_class(true)
+            }
             Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
                 token.recover();
                 Stmt::Item(self.parse_item())

@@ -261,6 +261,7 @@ pub enum Keyword {
     Inherits,
     Fallible,
     Try,
+    Abstract,
 }
 
 impl fmt::Display for Keyword {
@@ -287,6 +288,7 @@ impl fmt::Display for Keyword {
             Keyword::Inherits => "inherits",
             Keyword::Fallible => "fallible",
             Keyword::Try => "try",
+            Keyword::Abstract => "abstract",
         };
         write!(f, "{keyword}")
     }

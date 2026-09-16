@@ -47,6 +47,7 @@ impl TokenParser for KeywordParser {
             keyword("override").value(Keyword::Override),
             keyword("fallible").value(Keyword::Fallible),
             keyword("try").value(Keyword::Try),
+            keyword("abstract").value(Keyword::Abstract),
         ))
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))

@@ -50,7 +50,8 @@ pub struct Signature {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemMethod {
     pub signature: Signature,
-    pub body: Block,
+    /// `None` for an abstract method (no body).
+    pub body: Option<Block>,
     pub inline: bool,
 }
 
@@ -59,6 +60,7 @@ pub enum Prefix {
     Override,
     Fallible,
     OverrideFallible,
+    Abstract,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,6 +74,7 @@ pub struct ItemClass {
     pub name: String,
     pub superclass: Option<Vec<String>>,
     pub body: Vec<Item>,
+    pub is_abstract: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -186,25 +189,26 @@ impl Display for Signature {
 
 impl Display for ItemMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.inline {
-            write!(
+        write!(f, "{}{}", "method ".magenta(), self.signature)?;
+        match &self.body {
+            None => Ok(()),
+            Some(body) if self.inline => write!(
                 f,
-                "{}{} = {}",
-                "method ".magenta(),
-                self.signature,
-                self.body
-                    .stmts
+                " = {}",
+                body.stmts
                     .first()
                     .expect("Method body should have at least one statement")
-            )
-        } else {
-            write!(f, "{}{} {}", "method ".magenta(), self.signature, self.body)
+            ),
+            Some(body) => write!(f, " {body}"),
         }
     }
 }
 
 impl Display for ItemClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_abstract {
+            write!(f, "{}", "abstract ".magenta())?;
+        }
         write!(f, "{}{}", "class ".magenta(), self.name.cyan())?;
         if let Some(superclass) = &self.superclass {
             write!(f, "{}", " inherits ".magenta())?;
@@ -275,6 +279,7 @@ impl Display for ItemPrefixedMethod {
             Prefix::Override => write!(f, "{}", "override ".magenta()),
             Prefix::Fallible => write!(f, "{}", "fallible ".magenta()),
             Prefix::OverrideFallible => write!(f, "{}", "override fallible ".magenta()),
+            Prefix::Abstract => write!(f, "{}", "abstract ".magenta()),
         }?;
         write!(f, "{}", self.method)
     }

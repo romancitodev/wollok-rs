@@ -45,6 +45,18 @@ impl Ast<'_> {
                 prefix: Prefix::Fallible,
                 method,
             })
+        } else if self.consume(&kw!(Abstract)) {
+            info!("Entering on abstract method");
+            self.expect_token(&kw!(Method));
+            let signature = self.parse_method_signature();
+            Item::PrefixedMethod(ItemPrefixedMethod {
+                prefix: Prefix::Abstract,
+                method: ItemMethod {
+                    signature,
+                    body: None,
+                    inline: false,
+                },
+            })
         } else {
             self.parse_item()
         }
@@ -89,14 +101,14 @@ impl Ast<'_> {
                     self.expect_token(&T!(CloseBrace));
                     Item::Method(ItemMethod {
                         signature,
-                        body,
+                        body: Some(body),
                         inline: false,
                     })
                 } else if self.consume(&T!(Equals)) {
                     let body = self.parse_inline_block();
                     Item::Method(ItemMethod {
                         signature,
-                        body,
+                        body: Some(body),
                         inline: true,
                     })
                 } else {
@@ -139,8 +151,8 @@ impl Ast<'_> {
         params
     }
 
-    /// Parses an object declaration with its body
-    pub(crate) fn parse_class(&mut self) -> Stmt {
+    /// Parses a class declaration with its body
+    pub(crate) fn parse_class(&mut self, is_abstract: bool) -> Stmt {
         trace!("Starting class parsing");
         let name = self.expect_match("Expected class identifier", |t| t.into_ident()); // Here we should expect the object ident.
         let mut superclass = Vec::new();
@@ -175,6 +187,7 @@ impl Ast<'_> {
             name,
             body,
             superclass: (!superclass.is_empty()).then_some(superclass),
+            is_abstract,
         }))
     }
 

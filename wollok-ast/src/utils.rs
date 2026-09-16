@@ -46,7 +46,7 @@ macro_rules! items {
                 ident: $name.to_owned(),
                 params: $params,
               },
-              body: $crate::expr::Block { stmts: $body },
+              body: Some($crate::expr::Block { stmts: $body }),
               inline: $inline,
         })
     };
