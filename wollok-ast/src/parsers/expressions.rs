@@ -140,7 +140,8 @@ impl Ast<'_> {
                     let block = self.parse_block();
                     self.expect_token(&T!(CloseBrace));
                     let catch = self.consume(&kw!(Catch)).then(|| {
-                        let param = self.expect_match("Expected catch parameter", |t| t.into_ident());
+                        let param =
+                            self.expect_match("Expected catch parameter", |t| t.into_ident());
                         self.expect_token(&T!(OpenBrace));
                         let block = self.parse_block();
                         self.expect_token(&T!(CloseBrace));
@@ -286,7 +287,9 @@ impl Ast<'_> {
     /// covers both `{ n => n.even() }` and a bare block like `{ 2 + 5 }`
     /// or a multi-statement `{ a = a + 1\nreturn a }`.
     fn parse_brace_closure(&mut self) -> Expr {
-        let params = self.optional(Self::try_parse_arrow_params).unwrap_or_default();
+        let params = self
+            .optional(Self::try_parse_arrow_params)
+            .unwrap_or_default();
         let body = self.parse_block();
         self.expect_token(&T!(CloseBrace));
         Expr::Closure(ExprClosure { params, body })

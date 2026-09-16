@@ -244,7 +244,11 @@ impl Ast<'_> {
         let body = self.parse_class_body();
         self.expect_token(&T!(CloseBrace));
         self.skip_trivia();
-        info!("Successfully parsed mixin '{}' with {} items", name, body.len());
+        info!(
+            "Successfully parsed mixin '{}' with {} items",
+            name,
+            body.len()
+        );
 
         Stmt::Item(Item::Mixin(ItemMixin { name, body }))
     }

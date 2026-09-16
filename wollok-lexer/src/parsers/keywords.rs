@@ -17,8 +17,9 @@ use crate::{
 fn keyword<'t>(literal: &'static str) -> impl Parser<Src<'t>, &'t str, LexerErr<'t>> {
     terminated(
         literal,
-        peek(opt(any::<Src<'t>, LexerErr<'t>>))
-            .verify(|next: &Option<char>| !matches!(next, Some(c) if c.is_alphanumeric() || *c == '_')),
+        peek(opt(any::<Src<'t>, LexerErr<'t>>)).verify(
+            |next: &Option<char>| !matches!(next, Some(c) if c.is_alphanumeric() || *c == '_'),
+        ),
     )
 }
 
