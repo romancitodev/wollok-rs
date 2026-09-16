@@ -1,4 +1,8 @@
-use winnow::{Parser, combinator::preceded, token::take_while};
+use winnow::{
+    Parser,
+    combinator::{alt, delimited, preceded},
+    token::{take_until, take_while},
+};
 
 use crate::{
     error::{Result, Src},
@@ -10,9 +14,12 @@ pub struct CommentParser;
 
 impl TokenParser for CommentParser {
     fn parse<'t>(input: &mut Src<'t>) -> Result<'t, Option<SpannedToken>> {
-        let (content, span) = preceded("//", take_while(0.., |c: char| c != '\n' && c != '\r'))
-            .with_span()
-            .parse_next(input)?;
+        let (content, span) = alt((
+            preceded("//", take_while(0.., |c: char| c != '\n' && c != '\r')),
+            delimited("/*", take_until(0.., "*/"), "*/"),
+        ))
+        .with_span()
+        .parse_next(input)?;
 
         Ok(Some(SpannedToken::new(
             Span::from(span),
@@ -46,6 +53,17 @@ mod tests {
         let token = result.unwrap();
 
         assert_eq!(token, cmt!(" comentario"));
+    }
+
+    #[test]
+    fn test_block_comment() {
+        let mut input = Src::new("/* hola\nmundo */ resto");
+        let result = CommentParser::parse(&mut input).unwrap();
+
+        assert!(result.is_some());
+        let token = result.unwrap();
+
+        assert_eq!(token, cmt!(" hola\nmundo "));
     }
 
     #[test]

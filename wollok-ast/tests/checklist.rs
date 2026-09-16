@@ -114,7 +114,6 @@ fn collection_conversions() {
 }
 
 #[test]
-#[ignore = "block comments /* */ not implemented yet"]
 fn block_comments() {
     parse("/* hola */ const a = 1");
 }
