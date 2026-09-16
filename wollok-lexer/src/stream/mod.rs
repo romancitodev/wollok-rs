@@ -5,8 +5,8 @@ use tracing::{debug, info, trace, warn};
 use crate::{
     error::{Result, Src},
     parsers::{
-        CommentParser, IdentifierParser, KeywordParser, LiteralParser, OperatorParser,
-        PunctuationParser, TokenParser, WhitespaceParser,
+        CommentParser, IdentifierParser, KeywordParser, LiteralParser, PunctuationParser,
+        TokenParser, WhitespaceParser,
     },
     token::SpannedToken,
 };
@@ -63,8 +63,7 @@ impl<'t> TokenStream<'t> {
             KeywordParser::parse,     // Keywords antes que identifiers
             LiteralParser::parse,     // Literales (números, strings, booleans)
             IdentifierParser::parse,  // Identificadores
-            PunctuationParser::parse, // Puntuación
-            OperatorParser::parse,    // Operadores
+            PunctuationParser::parse, // Puntuación / operadores
         ))
         .parse_next(&mut self.input);
 
@@ -158,7 +157,7 @@ mod tests {
 class Deposito {
   const formaciones = []
   method agregarFormacion(unTren) { formaciones.add(unTren) }
-  method vagonesMasPesados() { return formaciones.map({ tren -> tren.vagonMasPesado() }) }
+  method vagonesMasPesados() { return formaciones.map({ tren => tren.vagonMasPesado() }) }
 }
 ";
         let stream = TokenStream::new(source);
@@ -209,7 +208,7 @@ class Deposito {
                 T![OpenParen],
                 T![OpenBrace],
                 ident!("tren"),
-                T![Arrow],
+                T![FatArrow],
                 ident!("tren"),
                 T![Dot],
                 ident!("vagonMasPesado"),

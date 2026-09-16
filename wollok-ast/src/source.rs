@@ -31,8 +31,6 @@ impl<'i> Ast<'i> {
         }
     }
 
-    // ======== New Token API - Phase 1 ========
-
     /// Check if next token matches without consuming it
     pub fn check(&mut self, expected: &Token) -> bool {
         if let Some(peeked) = self.peek() {
@@ -148,6 +146,14 @@ impl<'i> Ast<'i> {
         }
     }
 
+    /// Soft-failing counterpart to `expect_match`, for use inside
+    /// `optional()`: returns `None` instead of panicking on a mismatch.
+    pub fn try_match<T>(&mut self, predicate: impl FnOnce(SpannedToken) -> Option<T>) -> Option<T> {
+        let first = self.tokens.pop_front()?;
+        self.last_offset = first.span.to;
+        predicate(first)
+    }
+
     pub fn expect_token(&mut self, token: &Token) -> SpannedToken {
         let mut checkpoint = self.clone();
         let fetched = self.peek_expect().token;
@@ -203,8 +209,6 @@ impl<'i> Ast<'i> {
         panic!("{msg}");
     }
 
-    // ======== Helper Methods - Phase 1 ========
-
     /// Try parsing with automatic rollback on failure
     pub fn optional<T>(&mut self, mut parser: impl FnMut(&mut Self) -> Option<T>) -> Option<T> {
         // Create a checkpoint by saving the current state
@@ -230,6 +234,7 @@ impl<'i> Ast<'i> {
         terminator: &Token,
     ) -> Vec<T> {
         let mut elements = Vec::new();
+        self.skip_trivia();
 
         // Check for empty list
         if self.check(terminator) {
@@ -239,15 +244,18 @@ impl<'i> Ast<'i> {
 
         // Parse first element
         elements.push(element_parser(self));
+        self.skip_trivia();
 
         // Parse remaining elements
         while self.consume(separator) {
+            self.skip_trivia();
             // Check for trailing separator
             if self.check(terminator) {
                 self.consume(terminator);
-                break;
+                return elements;
             }
             elements.push(element_parser(self));
+            self.skip_trivia();
         }
 
         // Consume terminator
@@ -268,6 +276,16 @@ impl<'i> Ast<'i> {
             &T!(Comma),
             terminator,
         )
+    }
+
+    /// Looks past any comments/newlines (without consuming anything) to see
+    /// whether the next real token is `expected`.
+    #[must_use]
+    pub fn next_significant_is(&self, expected: &Token) -> bool {
+        self.tokens
+            .iter()
+            .find(|t| !matches!(t.token, Token::Comment(_) | T!(Newline)))
+            .is_some_and(|t| t.token == *expected)
     }
 
     /// Unified whitespace and comment handling
@@ -300,5 +318,63 @@ impl std::ops::Deref for PeekedToken<'_, '_> {
 
     fn deref(&self) -> &Self::Target {
         &self.token
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wollok_lexer::token::Literal;
+
+    fn ast_with(tokens: Vec<Token>) -> Ast<'static> {
+        Ast {
+            base: "",
+            last_offset: 0,
+            tokens: tokens
+                .into_iter()
+                .map(|token| SpannedToken::new(Span::ZERO, token))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn try_match_consumes_and_returns_some_on_success() {
+        let mut ast = ast_with(vec![Token::Literal(Literal::Integer(42))]);
+
+        let value = ast.try_match(|t| match t.token {
+            Token::Literal(Literal::Integer(n)) => Some(n),
+            _ => None,
+        });
+
+        assert_eq!(value, Some(42));
+        assert!(ast.tokens.is_empty());
+    }
+
+    #[test]
+    fn try_match_fails_softly_instead_of_panicking() {
+        let mut ast = ast_with(vec![Token::Literal(Literal::Boolean(true))]);
+
+        let value = ast.try_match(|t| match t.token {
+            Token::Literal(Literal::Integer(n)) => Some(n),
+            _ => None,
+        });
+
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn optional_rolls_back_after_a_failed_try_match() {
+        let mut ast = ast_with(vec![Token::Literal(Literal::Boolean(true))]);
+
+        let result = ast.optional(|p| {
+            p.try_match(|t| match t.token {
+                Token::Literal(Literal::Integer(n)) => Some(n),
+                _ => None,
+            })
+        });
+
+        assert_eq!(result, None);
+        assert_eq!(ast.tokens.len(), 1);
+        assert_eq!(ast.tokens[0].token, Token::Literal(Literal::Boolean(true)));
     }
 }

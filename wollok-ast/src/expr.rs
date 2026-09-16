@@ -43,7 +43,7 @@ pub enum Expr {
     Unary(ExprUnary),
     // While(ExprWhile),
     Self_,
-    Super(ExprSuper),
+    Super_,
     New(ExprNew),
 }
 
@@ -80,7 +80,7 @@ pub struct ExprCall {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprClosure {
     pub params: Vec<String>, // nombres de parámetros
-    pub body: Box<Expr>,
+    pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,7 +98,7 @@ pub struct ExprField {
 pub struct ExprIf {
     pub condition: Box<Expr>,
     pub then: Block,
-    pub otherwise: Option<Box<Expr>>,
+    pub otherwise: Option<Block>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,6 +137,13 @@ pub struct ExprTry {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprTryBlock {
     pub block: Block,
+    pub catch: Option<ExprCatch>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExprCatch {
+    pub param: String,
+    pub block: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -151,11 +158,6 @@ pub struct ExprUnary {
 }
 
 // Expresiones específicas de Wollok
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ExprSuper {
-    pub args: Vec<Expr>,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprNew {
@@ -197,8 +199,8 @@ impl Display for Expr {
             Expr::TryBlock(expr) => expr,
             Expr::Tuple(expr) => expr,
             Expr::Unary(expr) => expr,
-            Expr::Self_ => &"Self",
-            Expr::Super(expr) => expr,
+            Expr::Self_ => &"self",
+            Expr::Super_ => &"super",
             Expr::New(expr) => expr,
         };
         write!(f, "{v}")
@@ -313,7 +315,7 @@ impl Display for ExprIf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}{}", "if ".magenta(), self.condition)?;
-        write!(f, " {{ ... }}")?; // Simplified display for blocks
+        write!(f, " {}", self.then)?;
         if let Some(else_expr) = &self.otherwise {
             write!(f, "{}{}", " else ".magenta(), else_expr)?;
         }
@@ -399,7 +401,17 @@ impl Display for ExprTry {
 
 impl Display for ExprTryBlock {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "try { ... }".magenta()) // Simplified display for blocks
+        write!(f, "{}{}", "try ".magenta(), self.block)?;
+        if let Some(catch) = &self.catch {
+            write!(
+                f,
+                "{}{} {}",
+                " catch ".magenta(),
+                catch.param.cyan(),
+                catch.block
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -419,23 +431,6 @@ impl Display for ExprTuple {
 impl Display for ExprUnary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.op, self.expr)
-    }
-}
-
-impl Display for ExprSuper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "super".magenta())?;
-        if !self.args.is_empty() {
-            write!(f, "(")?;
-            for (i, arg) in self.args.iter().enumerate() {
-                write!(f, "{arg}")?;
-                if i < self.args.len() - 1 {
-                    write!(f, ", ")?;
-                }
-            }
-            write!(f, ")")?;
-        }
-        Ok(())
     }
 }
 

@@ -138,6 +138,14 @@ pub enum Punctuation {
     Minus,
     Multiply,
     Div,
+    Modulo,
+    Pow,
+
+    // Comparison
+    Lt,
+    Le,
+    Gt,
+    Ge,
 
     // Bitwise
     BitAnd,
@@ -152,7 +160,7 @@ pub enum Punctuation {
     Or,   // ||
     Bang, // !, used for negation
 
-    Arrow,
+    FatArrow,
     Newline,
     Identation,
     OpenBrace,
@@ -177,6 +185,13 @@ impl fmt::Display for Punctuation {
             Punctuation::Minus => "-",
             Punctuation::Multiply => "*",
             Punctuation::Div => "/",
+            Punctuation::Modulo => "%",
+            Punctuation::Pow => "**",
+
+            Punctuation::Lt => "<",
+            Punctuation::Le => "<=",
+            Punctuation::Gt => ">",
+            Punctuation::Ge => ">=",
 
             Punctuation::BitAnd => "&",
             Punctuation::BitOr => "|",
@@ -188,7 +203,7 @@ impl fmt::Display for Punctuation {
             Punctuation::Or => "||",
             Punctuation::Bang => "!",
 
-            Punctuation::Arrow => "->",
+            Punctuation::FatArrow => "=>",
             Punctuation::Newline => "\n",
             Punctuation::Identation => "\t",
             Punctuation::OpenBrace => "{",
@@ -245,6 +260,10 @@ pub enum Keyword {
     Mixin,
     Inherits,
     Fallible,
+    Try,
+    Abstract,
+    With,
+    Catch,
 }
 
 impl fmt::Display for Keyword {
@@ -270,6 +289,10 @@ impl fmt::Display for Keyword {
             Keyword::Mixin => "mixin",
             Keyword::Inherits => "inherits",
             Keyword::Fallible => "fallible",
+            Keyword::Try => "try",
+            Keyword::Abstract => "abstract",
+            Keyword::With => "with",
+            Keyword::Catch => "catch",
         };
         write!(f, "{keyword}")
     }

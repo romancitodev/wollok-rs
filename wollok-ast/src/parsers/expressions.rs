@@ -5,14 +5,18 @@
 /// - Assignment expressions
 /// - Field access expressions
 use tracing::{debug, trace};
-use wollok_common::ast::BinaryOp;
+use wollok_common::ast::{BinaryOp, UnaryOp};
 use wollok_lexer::{
     macros::{T, kw},
     token::Token,
 };
 
 use crate::{
-    expr::{Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprLit},
+    ast::Stmt,
+    expr::{
+        Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprCatch, ExprClosure, ExprField, ExprIf,
+        ExprLit, ExprReturn, ExprTry, ExprTryBlock, ExprUnary,
+    },
     source::Ast,
 };
 
@@ -41,8 +45,18 @@ impl Ast<'_> {
 
     /// Parses primary expressions (literals, identifiers, collections, etc.)
     pub(crate) fn parse_primary_expr(&mut self) -> Expr {
-        let expr = self.parse_postfix_expr();
+        let expr = self.parse_unary_expr();
         self.parse_binary_expr(expr, 0)
+    }
+
+    pub(crate) fn parse_unary_expr(&mut self) -> Expr {
+        if self.consume(&T!(Bang)) {
+            return Expr::Unary(ExprUnary {
+                op: UnaryOp::Not,
+                expr: Box::new(self.parse_unary_expr()),
+            });
+        }
+        self.parse_postfix_expr()
     }
 
     /// Parses postfix expressions (function calls, field access, etc.)
@@ -51,6 +65,9 @@ impl Ast<'_> {
         let mut expr = self.parse_atomic_expr();
 
         loop {
+            if self.next_significant_is(&T!(Dot)) {
+                self.skip_trivia();
+            }
             if self.check(&T!(OpenParen)) && Self::is_callable(&expr) {
                 // Function call: expr() - but only if expr is callable
                 let args = self.parse_params();
@@ -85,8 +102,8 @@ impl Ast<'_> {
             Expr::Call(_) |
             // Object instantiation can be called: new Foo().method()
             Expr::Class(_) |
-            // Self can be called: self()
-            Expr::Self_
+            Expr::Self_ |
+            Expr::Super_
         )
     }
 
@@ -97,19 +114,62 @@ impl Ast<'_> {
         self.skip_comments();
 
         match *token {
-            Token::Ident(ref ident) => Expr::Field(ExprField {
-                name: ident.clone(),
-                base: Box::new(Expr::Self_),
-            }),
+            Token::Ident(ref ident) => {
+                if self.consume(&T!(FatArrow)) {
+                    Expr::Closure(ExprClosure {
+                        params: vec![ident.clone()],
+                        body: self.parse_expr_or_block(),
+                    })
+                } else {
+                    Expr::Field(ExprField {
+                        name: ident.clone(),
+                        base: Box::new(Expr::Self_),
+                    })
+                }
+            }
             kw!(New) => {
                 let name = self.expect_match("Expected class name", |t| t.into_ident());
                 let params = self.parse_params();
                 Expr::Class(crate::expr::ExprClass { name, params })
             }
+            kw!(This) => Expr::Self_,
+            kw!(Super) => Expr::Super_,
+            kw!(If) => self.parse_if_expr(),
+            kw!(Try) => {
+                if self.consume(&T!(OpenBrace)) {
+                    let block = self.parse_block();
+                    self.expect_token(&T!(CloseBrace));
+                    let catch = self.consume(&kw!(Catch)).then(|| {
+                        let param =
+                            self.expect_match("Expected catch parameter", |t| t.into_ident());
+                        self.expect_token(&T!(OpenBrace));
+                        let block = self.parse_block();
+                        self.expect_token(&T!(CloseBrace));
+                        ExprCatch { param, block }
+                    });
+                    Expr::TryBlock(ExprTryBlock { block, catch })
+                } else {
+                    Expr::Try(ExprTry {
+                        expr: Box::new(self.parse_expr()),
+                    })
+                }
+            }
+            kw!(Return) => {
+                let value = (!self.check(&T!(Newline)) && !self.check(&T!(CloseBrace)))
+                    .then(|| Box::new(self.parse_expr()));
+                Expr::Return(ExprReturn { value })
+            }
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),
-            T!(OpenParen) => self.parse_parenthesized_expr(),
+            T!(OpenParen) => match self.optional(Self::try_parse_closure_signature) {
+                Some(params) => Expr::Closure(ExprClosure {
+                    params,
+                    body: self.parse_expr_or_block(),
+                }),
+                None => self.parse_parenthesized_expr(),
+            },
+            T!(OpenBrace) => self.parse_brace_closure(),
             _ => self.error_in_place("Expected expression"),
         }
     }
@@ -123,7 +183,7 @@ impl Ast<'_> {
 
             self.advance(); // consume operator
             let next_prec = if right_assoc { prec } else { prec + 1 };
-            let rhs_atomic = self.parse_postfix_expr();
+            let rhs_atomic = self.parse_unary_expr();
             let rhs = self.parse_binary_expr(rhs_atomic, next_prec);
 
             lhs = Expr::Binary(ExprBinary {
@@ -140,15 +200,117 @@ impl Ast<'_> {
         self.peek().and_then(|peeked| {
             let token = &peeked.token.token;
             let result = match token {
-                T!(Multiply) => Some((BinaryOp::Multiply, 4, false)),
-                T!(Div) => Some((BinaryOp::Div, 4, false)),
-                T!(Plus) => Some((BinaryOp::Plus, 2, false)),
-                T!(Minus) => Some((BinaryOp::Minus, 2, false)),
+                T!(Pow) => Some((BinaryOp::Pow, 6, true)),
+                T!(Multiply) => Some((BinaryOp::Multiply, 5, false)),
+                T!(Div) => Some((BinaryOp::Div, 5, false)),
+                T!(Modulo) => Some((BinaryOp::Modulo, 5, false)),
+                T!(Plus) => Some((BinaryOp::Plus, 4, false)),
+                T!(Minus) => Some((BinaryOp::Minus, 4, false)),
+                T!(Lt) => Some((BinaryOp::Lt, 3, false)),
+                T!(Le) => Some((BinaryOp::Le, 3, false)),
+                T!(Gt) => Some((BinaryOp::Gt, 3, false)),
+                T!(Ge) => Some((BinaryOp::Ge, 3, false)),
+                T!(Eq) => Some((BinaryOp::Eq, 2, false)),
+                T!(Ne) => Some((BinaryOp::Ne, 2, false)),
+                T!(And) => Some((BinaryOp::And, 1, false)),
+                T!(Or) => Some((BinaryOp::Or, 0, false)),
                 _ => None,
             };
             peeked.recover();
             result
         })
+    }
+
+    pub(crate) fn parse_if_expr(&mut self) -> Expr {
+        debug!("Parsing if expression");
+        self.expect_token(&T!(OpenParen));
+        let condition = Box::new(self.parse_expr());
+        self.expect_token(&T!(CloseParen));
+
+        let then = self.parse_expr_or_block();
+        let otherwise = self.consume(&kw!(Else)).then(|| self.parse_expr_or_block());
+
+        Expr::If(ExprIf {
+            condition,
+            then,
+            otherwise,
+        })
+    }
+
+    /// A `{ block }` or a single expression treated as a one-statement block.
+    fn parse_expr_or_block(&mut self) -> Block {
+        if self.consume(&T!(OpenBrace)) {
+            let block = self.parse_block();
+            self.expect_token(&T!(CloseBrace));
+            block
+        } else {
+            Block {
+                stmts: vec![Stmt::Expr(self.parse_expr())],
+            }
+        }
+    }
+
+    /// None means "not a closure signature" (e.g. `(1 + 2)`); `optional()`
+    /// rolls back whatever this consumed.
+    fn try_parse_closure_signature(&mut self) -> Option<Vec<String>> {
+        let mut params = Vec::new();
+
+        match self.try_match(|t| match t.token {
+            T!(CloseParen) => Some(None),
+            Token::Ident(name) => Some(Some(name)),
+            _ => None,
+        })? {
+            None => return self.closure_signature_if_arrow_follows(params),
+            Some(name) => params.push(name),
+        }
+
+        loop {
+            let has_next = self.try_match(|t| match t.token {
+                T!(Comma) => Some(true),
+                T!(CloseParen) => Some(false),
+                _ => None,
+            })?;
+            if has_next {
+                params.push(self.try_match(|t| t.token.into_ident())?);
+            } else {
+                break;
+            }
+        }
+        self.closure_signature_if_arrow_follows(params)
+    }
+
+    fn closure_signature_if_arrow_follows(&mut self, params: Vec<String>) -> Option<Vec<String>> {
+        self.try_match(|t| matches!(t.token, T!(FatArrow)).then_some(()))?;
+        Some(params)
+    }
+
+    /// `{ params => body }` when a `params =>` prefix is actually there,
+    /// otherwise a 0-param closure whose body is everything up to `}` —
+    /// covers both `{ n => n.even() }` and a bare block like `{ 2 + 5 }`
+    /// or a multi-statement `{ a = a + 1\nreturn a }`.
+    fn parse_brace_closure(&mut self) -> Expr {
+        let params = self
+            .optional(Self::try_parse_arrow_params)
+            .unwrap_or_default();
+        let body = self.parse_block();
+        self.expect_token(&T!(CloseBrace));
+        Expr::Closure(ExprClosure { params, body })
+    }
+
+    fn try_parse_arrow_params(&mut self) -> Option<Vec<String>> {
+        let mut params = vec![self.try_match(|t| t.token.into_ident())?];
+        loop {
+            let has_next = self.try_match(|t| match t.token {
+                T!(Comma) => Some(true),
+                T!(FatArrow) => Some(false),
+                _ => None,
+            })?;
+            if has_next {
+                params.push(self.try_match(|t| t.token.into_ident())?);
+            } else {
+                return Some(params);
+            }
+        }
     }
 
     /// Parses expressions enclosed in parentheses

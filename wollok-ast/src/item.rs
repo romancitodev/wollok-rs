@@ -12,6 +12,7 @@ pub enum Item {
     PrefixedMethod(ItemPrefixedMethod),
     Class(ItemClass),
     Object(ItemObject),
+    Mixin(ItemMixin),
     Import(ItemImport),
     Test(ItemTest),
     Program(ItemProgram),
@@ -50,7 +51,8 @@ pub struct Signature {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemMethod {
     pub signature: Signature,
-    pub body: Block,
+    /// `None` for an abstract method (no body).
+    pub body: Option<Block>,
     pub inline: bool,
 }
 
@@ -59,6 +61,7 @@ pub enum Prefix {
     Override,
     Fallible,
     OverrideFallible,
+    Abstract,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -71,11 +74,19 @@ pub struct ItemPrefixedMethod {
 pub struct ItemClass {
     pub name: String,
     pub superclass: Option<Vec<String>>,
+    pub mixins: Option<Vec<String>>,
     pub body: Vec<Item>,
+    pub is_abstract: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ItemObject {
+    pub name: String,
+    pub body: Vec<Item>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ItemMixin {
     pub name: String,
     pub body: Vec<Item>,
 }
@@ -113,6 +124,7 @@ impl Display for Item {
             Item::Method(item) => write!(f, "{item}"),
             Item::Class(item) => write!(f, "{item}"),
             Item::Object(item) => write!(f, "{item}"),
+            Item::Mixin(item) => write!(f, "{item}"),
             Item::Import(item) => write!(f, "{item}"),
             Item::Test(item) => write!(f, "{item}"),
             Item::Program(item) => write!(f, "{item}"),
@@ -186,25 +198,26 @@ impl Display for Signature {
 
 impl Display for ItemMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.inline {
-            write!(
+        write!(f, "{}{}", "method ".magenta(), self.signature)?;
+        match &self.body {
+            None => Ok(()),
+            Some(body) if self.inline => write!(
                 f,
-                "{}{} = {}",
-                "method ".magenta(),
-                self.signature,
-                self.body
-                    .stmts
+                " = {}",
+                body.stmts
                     .first()
                     .expect("Method body should have at least one statement")
-            )
-        } else {
-            write!(f, "{}{} {}", "method ".magenta(), self.signature, self.body)
+            ),
+            Some(body) => write!(f, " {body}"),
         }
     }
 }
 
 impl Display for ItemClass {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_abstract {
+            write!(f, "{}", "abstract ".magenta())?;
+        }
         write!(f, "{}{}", "class ".magenta(), self.name.cyan())?;
         if let Some(superclass) = &self.superclass {
             write!(f, "{}", " inherits ".magenta())?;
@@ -212,11 +225,28 @@ impl Display for ItemClass {
                 write!(f, "{}, ", class.cyan())?;
             }
         }
+        if let Some(mixins) = &self.mixins {
+            write!(f, "{}", " with ".magenta())?;
+            for mixin in mixins {
+                write!(f, "{}, ", mixin.cyan())?;
+            }
+        }
         write!(f, "{{")?;
         for item in &self.body {
             write!(f, " {item}; ")?;
         }
         write!(f, " }}")
+    }
+}
+
+impl Display for ItemMixin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", "mixin ".magenta(), self.name.cyan())?;
+        writeln!(f, " {{")?;
+        for item in &self.body {
+            writeln!(f, "\t {item}; ")?;
+        }
+        writeln!(f, " }}")
     }
 }
 
@@ -275,6 +305,7 @@ impl Display for ItemPrefixedMethod {
             Prefix::Override => write!(f, "{}", "override ".magenta()),
             Prefix::Fallible => write!(f, "{}", "fallible ".magenta()),
             Prefix::OverrideFallible => write!(f, "{}", "override fallible ".magenta()),
+            Prefix::Abstract => write!(f, "{}", "abstract ".magenta()),
         }?;
         write!(f, "{}", self.method)
     }

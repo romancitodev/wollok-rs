@@ -6,26 +6,28 @@
 /// - Property declarations
 /// - Const and let declarations
 use tracing::{debug, info, trace, warn};
-use wollok_lexer::macros::{T, kw};
+use wollok_lexer::{
+    macros::{T, kw},
+    token::Token,
+};
 
 use crate::{
     ast::Stmt,
     expr::Expr,
     item::{
-        Item, ItemClass, ItemConst, ItemLet, ItemMethod, ItemObject, ItemPrefixedMethod,
-        ItemProperty, Prefix, Signature,
+        Item, ItemClass, ItemConst, ItemImport, ItemLet, ItemMethod, ItemMixin, ItemObject,
+        ItemPrefixedMethod, ItemProperty, Prefix, Signature,
     },
     source::Ast,
 };
 
 impl Ast<'_> {
     fn parse_override(&mut self) -> (Item, Prefix) {
-        let item = self.parse_item();
         if self.consume(&kw!(Fallible)) {
             info!("Entering on fallible method");
-            (item, Prefix::OverrideFallible)
+            (self.parse_item(), Prefix::OverrideFallible)
         } else {
-            (item, Prefix::Override)
+            (self.parse_item(), Prefix::Override)
         }
     }
 
@@ -45,6 +47,18 @@ impl Ast<'_> {
             Item::PrefixedMethod(ItemPrefixedMethod {
                 prefix: Prefix::Fallible,
                 method,
+            })
+        } else if self.consume(&kw!(Abstract)) {
+            info!("Entering on abstract method");
+            self.expect_token(&kw!(Method));
+            let signature = self.parse_method_signature();
+            Item::PrefixedMethod(ItemPrefixedMethod {
+                prefix: Prefix::Abstract,
+                method: ItemMethod {
+                    signature,
+                    body: None,
+                    inline: false,
+                },
             })
         } else {
             self.parse_item()
@@ -90,14 +104,14 @@ impl Ast<'_> {
                     self.expect_token(&T!(CloseBrace));
                     Item::Method(ItemMethod {
                         signature,
-                        body,
+                        body: Some(body),
                         inline: false,
                     })
                 } else if self.consume(&T!(Equals)) {
                     let body = self.parse_inline_block();
                     Item::Method(ItemMethod {
                         signature,
-                        body,
+                        body: Some(body),
                         inline: true,
                     })
                 } else {
@@ -140,27 +154,47 @@ impl Ast<'_> {
         params
     }
 
-    /// Parses an object declaration with its body
-    pub(crate) fn parse_class(&mut self) -> Stmt {
+    pub(crate) fn parse_import(&mut self) -> Stmt {
+        let mut module = self.expect_match("Expected module name", |t| t.into_ident());
+        let mut wildcard = false;
+
+        while self.consume(&T!(Dot)) {
+            if self.consume(&T!(Multiply)) {
+                wildcard = true;
+                break;
+            }
+            let part = self.expect_match("Expected module path segment", |t| t.into_ident());
+            module.push('.');
+            module.push_str(&part);
+        }
+
+        Stmt::Item(Item::Import(ItemImport { module, wildcard }))
+    }
+
+    /// Parses `keyword name, name, ...`, e.g. `inherits A, B` or
+    /// `with M, N`. Returns `None` if `keyword` isn't there at all.
+    fn parse_name_list_after(&mut self, keyword: &Token) -> Option<Vec<String>> {
+        if !self.consume(keyword) {
+            return None;
+        }
+        let mut names = vec![self.expect_match("Expected identifier", |t| t.into_ident())];
+        while self.consume(&T!(Comma)) {
+            if self.check(&T!(OpenBrace)) {
+                let (span, _) = self.advance().unwrap().split();
+                self.error_at(span, "Expected identifer, got , instead");
+            }
+            names.push(self.expect_match("Expected identifier", |t| t.into_ident()));
+        }
+        Some(names)
+    }
+
+    /// Parses a class declaration with its body
+    pub(crate) fn parse_class(&mut self, is_abstract: bool) -> Stmt {
         trace!("Starting class parsing");
         let name = self.expect_match("Expected class identifier", |t| t.into_ident()); // Here we should expect the object ident.
-        let mut superclass = Vec::new();
         debug!("Parsing class '{}'", name);
-        if self.consume(&kw!(Inherits)) {
-            debug!("parsing inherits");
-            let first_name =
-                self.expect_match("Expected superclass identifier", |t| t.into_ident());
-            superclass.push(first_name);
-
-            while self.consume(&T!(Comma)) {
-                if self.check(&T!(OpenBrace)) {
-                    let (span, _) = self.advance().unwrap().split();
-                    self.error_at(span, "Expected superclass identifer, got , instead");
-                }
-                let name = self.expect_match("Expected superclass identifier", |t| t.into_ident());
-                superclass.push(name);
-            }
-        }
+        let superclass = self.parse_name_list_after(&kw!(Inherits));
+        let mixins = self.parse_name_list_after(&kw!(With));
         self.expect_token(&T!(OpenBrace)); // Here we should expect the `{`
         self.skip_trivia();
         let body = self.parse_class_body();
@@ -174,8 +208,10 @@ impl Ast<'_> {
 
         Stmt::Item(Item::Class(ItemClass {
             name,
+            superclass,
+            mixins,
             body,
-            superclass: (!superclass.is_empty()).then_some(superclass),
+            is_abstract,
         }))
     }
 
@@ -196,6 +232,25 @@ impl Ast<'_> {
         );
 
         Stmt::Item(Item::Object(ItemObject { name, body }))
+    }
+
+    /// Parses a mixin declaration with its body (methods, including
+    /// abstract ones — a mixin body parses like a class body).
+    pub(crate) fn parse_mixin(&mut self) -> Stmt {
+        trace!("Starting mixin parsing");
+        let name = self.expect_match("Expected mixin identifier", |t| t.into_ident());
+        self.expect_token(&T!(OpenBrace));
+        self.skip_trivia();
+        let body = self.parse_class_body();
+        self.expect_token(&T!(CloseBrace));
+        self.skip_trivia();
+        info!(
+            "Successfully parsed mixin '{}' with {} items",
+            name,
+            body.len()
+        );
+
+        Stmt::Item(Item::Mixin(ItemMixin { name, body }))
     }
 
     /// Parses the body of an object (its properties, methods, etc.)

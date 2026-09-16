@@ -1,4 +1,9 @@
-use winnow::{Parser, combinator::alt, error::ParserError};
+use winnow::{
+    Parser,
+    combinator::{alt, opt, peek, terminated},
+    error::ParserError,
+    token::any,
+};
 
 use crate::{
     error::{LexerErr, Result, Src},
@@ -6,31 +11,48 @@ use crate::{
     token::{Keyword, Span, SpannedToken, Token},
 };
 
+/// Matches a keyword literal, but only if it isn't immediately followed by
+/// another identifier character (so `constructorLlamaSuper` isn't lexed as
+/// `const` + `ructorLlamaSuper`).
+fn keyword<'t>(literal: &'static str) -> impl Parser<Src<'t>, &'t str, LexerErr<'t>> {
+    terminated(
+        literal,
+        peek(opt(any::<Src<'t>, LexerErr<'t>>)).verify(
+            |next: &Option<char>| !matches!(next, Some(c) if c.is_alphanumeric() || *c == '_'),
+        ),
+    )
+}
+
 pub struct KeywordParser;
 
 impl TokenParser for KeywordParser {
     fn parse<'t>(input: &mut Src<'t>) -> Result<'t, Option<SpannedToken>> {
-        let result = alt((
-            "if".value(Keyword::If),
-            "else".value(Keyword::Else),
-            "object".value(Keyword::Object),
-            "class".value(Keyword::Class),
-            "method".value(Keyword::Method),
-            "import".value(Keyword::Import),
-            "describe".value(Keyword::Describe),
-            "test".value(Keyword::Test),
-            "assert".value(Keyword::Assert),
-            "const".value(Keyword::Const),
-            "let".value(Keyword::Let),
-            "self".value(Keyword::This), // Using `self` as a keyword
-            "property".value(Keyword::Property),
-            "super".value(Keyword::Super),
-            "return".value(Keyword::Return),
-            "new".value(Keyword::New),
-            "inherits".value(Keyword::Inherits),
-            "override".value(Keyword::Override),
-            "fallible".value(Keyword::Fallible),
-        ))
+        let result = alt([
+            keyword("if").value(Keyword::If),
+            keyword("else").value(Keyword::Else),
+            keyword("object").value(Keyword::Object),
+            keyword("class").value(Keyword::Class),
+            keyword("method").value(Keyword::Method),
+            keyword("import").value(Keyword::Import),
+            keyword("describe").value(Keyword::Describe),
+            keyword("test").value(Keyword::Test),
+            keyword("assert").value(Keyword::Assert),
+            keyword("const").value(Keyword::Const),
+            keyword("let").value(Keyword::Let),
+            keyword("self").value(Keyword::This), // Using `self` as a keyword
+            keyword("property").value(Keyword::Property),
+            keyword("super").value(Keyword::Super),
+            keyword("return").value(Keyword::Return),
+            keyword("new").value(Keyword::New),
+            keyword("inherits").value(Keyword::Inherits),
+            keyword("override").value(Keyword::Override),
+            keyword("fallible").value(Keyword::Fallible),
+            keyword("try").value(Keyword::Try),
+            keyword("abstract").value(Keyword::Abstract),
+            keyword("mixin").value(Keyword::Mixin),
+            keyword("with").value(Keyword::With),
+            keyword("catch").value(Keyword::Catch),
+        ])
         .with_span()
         .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))
         .parse_next(input)?;
@@ -80,6 +102,14 @@ mod tests {
     #[test]
     fn test_not_a_keyword() {
         let mut input = Src::new("variable");
+        let result = KeywordParser::parse(&mut input);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_identifier_prefixed_by_keyword() {
+        let mut input = Src::new("constructorLlamaSuper");
         let result = KeywordParser::parse(&mut input);
 
         assert!(result.is_err());

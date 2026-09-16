@@ -510,8 +510,6 @@ name = "wollok-common"
 version = "0.1.0"
 dependencies = [
  "owo-colors",
- "tracing",
- "wollok-lexer",
 ]
 
 [[package]]

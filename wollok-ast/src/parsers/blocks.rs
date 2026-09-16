@@ -38,23 +38,18 @@ impl Ast<'_> {
         Block { stmts }
     }
 
-    /// Parses a single expression inside an inline method body (method = expr)
+    /// Parses a single expression inside an inline method body (method = expr).
+    /// The expression may start on the next line (`method foo() =\n    expr`).
     pub(crate) fn parse_inline_block(&mut self) -> Block {
         trace!("Parsing inline block");
-        let mut stmts = Vec::new();
+        self.skip_trivia();
 
-        // Check if we hit a newline (end of inline block)
-        if self.check(&T!(Newline)) {
-            trace!("Empty inline block");
-            return Block { stmts };
-        }
-
-        // Parse single expression
         let stmt = self.parse_expr();
         trace!("Parsed statement: {:?}", stmt);
-        stmts.push(Stmt::Expr(stmt));
 
-        Block { stmts }
+        Block {
+            stmts: vec![Stmt::Expr(stmt)],
+        }
     }
 
     /// Parses a single statement (can be a local declaration or an expression)
@@ -63,7 +58,13 @@ impl Ast<'_> {
         let token = self.peek_expect();
         match **token {
             kw!(Object) => self.parse_object(),
-            kw!(Class) => self.parse_class(),
+            kw!(Class) => self.parse_class(false),
+            kw!(Abstract) => {
+                self.expect_token(&kw!(Class));
+                self.parse_class(true)
+            }
+            kw!(Import) => self.parse_import(),
+            kw!(Mixin) => self.parse_mixin(),
             Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
                 token.recover();
                 Stmt::Item(self.parse_item())
