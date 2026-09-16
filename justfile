@@ -15,3 +15,10 @@ run args filter="trace":
 
 run-release filter="info":
   with-env { RUST_LOG: "wollok={{filter}}" } { cargo run --release }
+
+# requires `cargo install cargo-llvm-cov` once
+coverage:
+  cargo llvm-cov --workspace --html --open
+
+coverage-summary:
+  cargo llvm-cov --workspace --summary-only
