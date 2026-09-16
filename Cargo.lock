@@ -522,6 +522,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "wollok-vm"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "wollok_rs"
 version = "0.1.0"
 dependencies = [
