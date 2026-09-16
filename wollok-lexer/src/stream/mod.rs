@@ -157,7 +157,7 @@ mod tests {
 class Deposito {
   const formaciones = []
   method agregarFormacion(unTren) { formaciones.add(unTren) }
-  method vagonesMasPesados() { return formaciones.map({ tren -> tren.vagonMasPesado() }) }
+  method vagonesMasPesados() { return formaciones.map({ tren => tren.vagonMasPesado() }) }
 }
 ";
         let stream = TokenStream::new(source);
@@ -208,7 +208,7 @@ class Deposito {
                 T![OpenParen],
                 T![OpenBrace],
                 ident!("tren"),
-                T![Arrow],
+                T![FatArrow],
                 ident!("tren"),
                 T![Dot],
                 ident!("vagonMasPesado"),

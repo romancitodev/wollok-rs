@@ -160,7 +160,7 @@ pub enum Punctuation {
     Or,   // ||
     Bang, // !, used for negation
 
-    Arrow,
+    FatArrow,
     Newline,
     Identation,
     OpenBrace,
@@ -203,7 +203,7 @@ impl fmt::Display for Punctuation {
             Punctuation::Or => "||",
             Punctuation::Bang => "!",
 
-            Punctuation::Arrow => "->",
+            Punctuation::FatArrow => "=>",
             Punctuation::Newline => "\n",
             Punctuation::Identation => "\t",
             Punctuation::OpenBrace => "{",

@@ -14,8 +14,8 @@ use wollok_lexer::{
 use crate::{
     ast::Stmt,
     expr::{
-        Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprIf, ExprLit, ExprReturn,
-        ExprUnary,
+        Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprClosure, ExprField, ExprIf, ExprLit,
+        ExprReturn, ExprUnary,
     },
     source::Ast,
 };
@@ -113,10 +113,20 @@ impl Ast<'_> {
         self.skip_comments();
 
         match *token {
-            Token::Ident(ref ident) => Expr::Field(ExprField {
-                name: ident.clone(),
-                base: Box::new(Expr::Self_),
-            }),
+            Token::Ident(ref ident) => {
+                // `ident => body` is a single-param closure with no parens
+                if self.consume(&T!(FatArrow)) {
+                    Expr::Closure(ExprClosure {
+                        params: vec![ident.clone()],
+                        body: Box::new(self.parse_expr()),
+                    })
+                } else {
+                    Expr::Field(ExprField {
+                        name: ident.clone(),
+                        base: Box::new(Expr::Self_),
+                    })
+                }
+            }
             kw!(New) => {
                 let name = self.expect_match("Expected class name", |t| t.into_ident());
                 let params = self.parse_params();
@@ -133,7 +143,14 @@ impl Ast<'_> {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),
-            T!(OpenParen) => self.parse_parenthesized_expr(),
+            T!(OpenParen) => {
+                if self.peek_is_closure_params() {
+                    self.parse_closure_after_params()
+                } else {
+                    self.parse_parenthesized_expr()
+                }
+            }
+            T!(OpenBrace) => self.parse_brace_closure_expr(),
             _ => self.error_in_place("Expected expression"),
         }
     }
@@ -215,6 +232,65 @@ impl Ast<'_> {
                 stmts: vec![Stmt::Expr(self.parse_expr())],
             }
         }
+    }
+
+    /// Looks ahead (without consuming) past an already-consumed `(` to
+    /// check whether it opens a closure signature, i.e. `)` or
+    /// `ident (, ident)* )` immediately followed by `=>`.
+    fn peek_is_closure_params(&self) -> bool {
+        let mut idx = 0;
+        match self.tokens.get(idx).map(|t| &t.token) {
+            Some(T!(CloseParen)) => idx += 1,
+            Some(Token::Ident(_)) => {
+                idx += 1;
+                loop {
+                    match self.tokens.get(idx).map(|t| &t.token) {
+                        Some(T!(Comma)) => {
+                            idx += 1;
+                            match self.tokens.get(idx).map(|t| &t.token) {
+                                Some(Token::Ident(_)) => idx += 1,
+                                _ => return false,
+                            }
+                        }
+                        Some(T!(CloseParen)) => {
+                            idx += 1;
+                            break;
+                        }
+                        _ => return false,
+                    }
+                }
+            }
+            _ => return false,
+        }
+        matches!(self.tokens.get(idx).map(|t| &t.token), Some(T!(FatArrow)))
+    }
+
+    /// Parses `params) => body` right after the opening `(`, once
+    /// `peek_is_closure_params` confirmed the shape.
+    fn parse_closure_after_params(&mut self) -> Expr {
+        let params = self.parse_separated_list(
+            |p| p.expect_match("Expected parameter name", |t| t.into_ident()),
+            &T!(Comma),
+            &T!(CloseParen),
+        );
+        self.expect_token(&T!(FatArrow));
+        Expr::Closure(ExprClosure {
+            params,
+            body: Box::new(self.parse_expr()),
+        })
+    }
+
+    /// Parses a `{ params => body }` closure literal (comma-separated
+    /// params, no parens; body is a single expression).
+    fn parse_brace_closure_expr(&mut self) -> Expr {
+        let params = self.parse_separated_list(
+            |p| p.expect_match("Expected parameter name", |t| t.into_ident()),
+            &T!(Comma),
+            &T!(FatArrow),
+        );
+        let body = Box::new(self.parse_expr());
+        self.expect_token(&T!(CloseBrace));
+        Expr::Closure(ExprClosure { params, body })
     }
 
     /// Parses expressions enclosed in parentheses
