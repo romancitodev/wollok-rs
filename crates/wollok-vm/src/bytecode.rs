@@ -31,10 +31,13 @@ pub enum Instr {
     LoadField(FieldIdx),
     StoreField(FieldIdx),
 
+    /// Discards the top of the operand stack — e.g. a message send used
+    /// as a statement, whose result nobody wants.
+    Pop,
+
     /// `cache_slot` is reserved by the compiler for every `Send` it
-    /// emits, monomorphic-cache logic today — see dispatch.rs. Never
-    /// added after the fact: that would mean recompiling everything
-    /// already emitted.
+    /// emits — see dispatch.rs. Never added after the fact: that would
+    /// mean recompiling everything already emitted.
     Send {
         method_name: MethodNameIdx,
         arg_count: u8,

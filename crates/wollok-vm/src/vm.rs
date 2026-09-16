@@ -77,6 +77,10 @@ impl Vm {
                     self.heap.write_field(obj, *field, value);
                 }
 
+                Instr::Pop => {
+                    frame.pop();
+                }
+
                 Instr::Send {
                     method_name,
                     arg_count,
