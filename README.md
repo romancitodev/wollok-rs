@@ -116,11 +116,12 @@ El proyecto está organizado en varios crates:
 
 ```
 wollok-rs/
-├── wollok-lexer/     # Tokenización y análisis léxico
-├── wollok-ast/       # Parser y AST
-├── wollok-common/    # Tipos y utilidades compartidas
-├── wollok-cli/       # Interfaz de línea de comandos
-└── src/              # Ejecutable principal
+├── crates/
+│   ├── wollok-lexer/     # Tokenización y análisis léxico
+│   ├── wollok-ast/       # Parser y AST
+│   ├── wollok-common/    # Tipos y utilidades compartidas
+│   └── wollok-cli/       # Interfaz de línea de comandos
+└── src/                  # Ejecutable principal
 ```
 
 ### Flujo de Procesamiento
