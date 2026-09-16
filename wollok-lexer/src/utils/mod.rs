@@ -22,12 +22,3 @@ where
         parser.parse_next(input)
     }
 }
-
-/// Helper para verificar que un identificador no sea una keyword
-#[must_use]
-pub fn not_keyword(ident: &str) -> bool {
-    !matches!(
-        ident,
-        "if" | "else" | "object" | "class" | "method" | "import" | "describe" | "assert"
-    )
-}

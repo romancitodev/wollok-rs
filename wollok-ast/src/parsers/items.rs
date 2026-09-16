@@ -20,12 +20,11 @@ use crate::{
 
 impl Ast<'_> {
     fn parse_override(&mut self) -> (Item, Prefix) {
-        let item = self.parse_item();
         if self.consume(&kw!(Fallible)) {
             info!("Entering on fallible method");
-            (item, Prefix::OverrideFallible)
+            (self.parse_item(), Prefix::OverrideFallible)
         } else {
-            (item, Prefix::Override)
+            (self.parse_item(), Prefix::Override)
         }
     }
 

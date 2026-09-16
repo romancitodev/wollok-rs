@@ -31,8 +31,6 @@ impl<'i> Ast<'i> {
         }
     }
 
-    // ======== New Token API - Phase 1 ========
-
     /// Check if next token matches without consuming it
     pub fn check(&mut self, expected: &Token) -> bool {
         if let Some(peeked) = self.peek() {
@@ -202,8 +200,6 @@ impl<'i> Ast<'i> {
 
         panic!("{msg}");
     }
-
-    // ======== Helper Methods - Phase 1 ========
 
     /// Try parsing with automatic rollback on failure
     pub fn optional<T>(&mut self, mut parser: impl FnMut(&mut Self) -> Option<T>) -> Option<T> {
