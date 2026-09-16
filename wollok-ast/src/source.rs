@@ -280,6 +280,7 @@ impl<'i> Ast<'i> {
 
     /// Looks past any comments/newlines (without consuming anything) to see
     /// whether the next real token is `expected`.
+    #[must_use]
     pub fn next_significant_is(&self, expected: &Token) -> bool {
         self.tokens
             .iter()

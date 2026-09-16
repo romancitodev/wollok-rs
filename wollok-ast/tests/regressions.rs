@@ -1,5 +1,6 @@
-//! Regressions found by running every ```wollok code block in docs/*.md
-//! through the real parser instead of trusting that "the feature is done".
+//! Regressions found by running every `wollok` fenced code block in
+//! docs/*.md through the real parser instead of trusting that "the feature
+//! is done".
 
 use wollok_ast::ast::Scope;
 use wollok_lexer::lexer::TokenStream;

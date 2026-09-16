@@ -208,9 +208,9 @@ impl Ast<'_> {
 
         Stmt::Item(Item::Class(ItemClass {
             name,
-            body,
             superclass,
             mixins,
+            body,
             is_abstract,
         }))
     }

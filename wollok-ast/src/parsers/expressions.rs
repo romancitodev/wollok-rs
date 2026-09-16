@@ -250,7 +250,7 @@ impl Ast<'_> {
         }
     }
 
-    /// None means "not a closure signature" (e.g. `(1 + 2)`); optional()
+    /// None means "not a closure signature" (e.g. `(1 + 2)`); `optional()`
     /// rolls back whatever this consumed.
     fn try_parse_closure_signature(&mut self) -> Option<Vec<String>> {
         let mut params = Vec::new();
@@ -265,13 +265,15 @@ impl Ast<'_> {
         }
 
         loop {
-            match self.try_match(|t| match t.token {
+            let has_next = self.try_match(|t| match t.token {
                 T!(Comma) => Some(true),
                 T!(CloseParen) => Some(false),
                 _ => None,
-            })? {
-                false => break,
-                true => params.push(self.try_match(|t| t.token.into_ident())?),
+            })?;
+            if has_next {
+                params.push(self.try_match(|t| t.token.into_ident())?);
+            } else {
+                break;
             }
         }
         self.closure_signature_if_arrow_follows(params)
@@ -298,13 +300,15 @@ impl Ast<'_> {
     fn try_parse_arrow_params(&mut self) -> Option<Vec<String>> {
         let mut params = vec![self.try_match(|t| t.token.into_ident())?];
         loop {
-            match self.try_match(|t| match t.token {
+            let has_next = self.try_match(|t| match t.token {
                 T!(Comma) => Some(true),
                 T!(FatArrow) => Some(false),
                 _ => None,
-            })? {
-                false => return Some(params),
-                true => params.push(self.try_match(|t| t.token.into_ident())?),
+            })?;
+            if has_next {
+                params.push(self.try_match(|t| t.token.into_ident())?);
+            } else {
+                return Some(params);
             }
         }
     }
