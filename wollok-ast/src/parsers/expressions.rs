@@ -12,7 +12,11 @@ use wollok_lexer::{
 };
 
 use crate::{
-    expr::{Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprLit, ExprUnary},
+    ast::Stmt,
+    expr::{
+        Block, Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprIf, ExprLit, ExprReturn,
+        ExprUnary,
+    },
     source::Ast,
 };
 
@@ -120,6 +124,12 @@ impl Ast<'_> {
             }
             kw!(This) => Expr::Self_,
             kw!(Super) => Expr::Super_,
+            kw!(If) => self.parse_if_expr(),
+            kw!(Return) => {
+                let value = (!self.check(&T!(Newline)) && !self.check(&T!(CloseBrace)))
+                    .then(|| Box::new(self.parse_expr()));
+                Expr::Return(ExprReturn { value })
+            }
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),
@@ -173,6 +183,38 @@ impl Ast<'_> {
             peeked.recover();
             result
         })
+    }
+
+    /// Parses an `if (cond) then else otherwise` expression, where each
+    /// branch can be a `{ block }` or a single inline expression.
+    pub(crate) fn parse_if_expr(&mut self) -> Expr {
+        debug!("Parsing if expression");
+        self.expect_token(&T!(OpenParen));
+        let condition = Box::new(self.parse_expr());
+        self.expect_token(&T!(CloseParen));
+
+        let then = self.parse_branch_block();
+        let otherwise = self.consume(&kw!(Else)).then(|| self.parse_branch_block());
+
+        Expr::If(ExprIf {
+            condition,
+            then,
+            otherwise,
+        })
+    }
+
+    /// Parses one branch of an `if`/`else`: either a `{ ... }` block or a
+    /// single expression treated as a one-statement block.
+    fn parse_branch_block(&mut self) -> Block {
+        if self.consume(&T!(OpenBrace)) {
+            let block = self.parse_block();
+            self.expect_token(&T!(CloseBrace));
+            block
+        } else {
+            Block {
+                stmts: vec![Stmt::Expr(self.parse_expr())],
+            }
+        }
     }
 
     /// Parses expressions enclosed in parentheses

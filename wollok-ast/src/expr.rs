@@ -98,7 +98,7 @@ pub struct ExprField {
 pub struct ExprIf {
     pub condition: Box<Expr>,
     pub then: Block,
-    pub otherwise: Option<Box<Expr>>,
+    pub otherwise: Option<Block>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -308,7 +308,7 @@ impl Display for ExprIf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", "(expr) ".yellow())?;
         write!(f, "{}{}", "if ".magenta(), self.condition)?;
-        write!(f, " {{ ... }}")?; // Simplified display for blocks
+        write!(f, " {}", self.then)?;
         if let Some(else_expr) = &self.otherwise {
             write!(f, "{}{}", " else ".magenta(), else_expr)?;
         }
