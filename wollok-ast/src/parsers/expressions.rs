@@ -96,8 +96,9 @@ impl Ast<'_> {
             Expr::Call(_) |
             // Object instantiation can be called: new Foo().method()
             Expr::Class(_) |
-            // Self can be called: self()
-            Expr::Self_
+            // self()/super() call the current/parent constructor
+            Expr::Self_ |
+            Expr::Super_
         )
     }
 
@@ -117,6 +118,8 @@ impl Ast<'_> {
                 let params = self.parse_params();
                 Expr::Class(crate::expr::ExprClass { name, params })
             }
+            kw!(This) => Expr::Self_,
+            kw!(Super) => Expr::Super_,
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),

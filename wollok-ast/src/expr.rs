@@ -43,7 +43,7 @@ pub enum Expr {
     Unary(ExprUnary),
     // While(ExprWhile),
     Self_,
-    Super(ExprSuper),
+    Super_,
     New(ExprNew),
 }
 
@@ -153,11 +153,6 @@ pub struct ExprUnary {
 // Expresiones específicas de Wollok
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct ExprSuper {
-    pub args: Vec<Expr>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct ExprNew {
     pub class_name: String,
     pub args: Vec<Expr>,
@@ -197,8 +192,8 @@ impl Display for Expr {
             Expr::TryBlock(expr) => expr,
             Expr::Tuple(expr) => expr,
             Expr::Unary(expr) => expr,
-            Expr::Self_ => &"Self",
-            Expr::Super(expr) => expr,
+            Expr::Self_ => &"self",
+            Expr::Super_ => &"super",
             Expr::New(expr) => expr,
         };
         write!(f, "{v}")
@@ -419,23 +414,6 @@ impl Display for ExprTuple {
 impl Display for ExprUnary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}{}", self.op, self.expr)
-    }
-}
-
-impl Display for ExprSuper {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "super".magenta())?;
-        if !self.args.is_empty() {
-            write!(f, "(")?;
-            for (i, arg) in self.args.iter().enumerate() {
-                write!(f, "{arg}")?;
-                if i < self.args.len() - 1 {
-                    write!(f, ", ")?;
-                }
-            }
-            write!(f, ")")?;
-        }
-        Ok(())
     }
 }
 
