@@ -146,6 +146,14 @@ impl<'i> Ast<'i> {
         }
     }
 
+    /// Soft-failing counterpart to `expect_match`, for use inside
+    /// `optional()`: returns `None` instead of panicking on a mismatch.
+    pub fn try_match<T>(&mut self, predicate: impl FnOnce(SpannedToken) -> Option<T>) -> Option<T> {
+        let first = self.tokens.pop_front()?;
+        self.last_offset = first.span.to;
+        predicate(first)
+    }
+
     pub fn expect_token(&mut self, token: &Token) -> SpannedToken {
         let mut checkpoint = self.clone();
         let fetched = self.peek_expect().token;
@@ -296,5 +304,63 @@ impl std::ops::Deref for PeekedToken<'_, '_> {
 
     fn deref(&self) -> &Self::Target {
         &self.token
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wollok_lexer::token::Literal;
+
+    fn ast_with(tokens: Vec<Token>) -> Ast<'static> {
+        Ast {
+            base: "",
+            last_offset: 0,
+            tokens: tokens
+                .into_iter()
+                .map(|token| SpannedToken::new(Span::ZERO, token))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn try_match_consumes_and_returns_some_on_success() {
+        let mut ast = ast_with(vec![Token::Literal(Literal::Integer(42))]);
+
+        let value = ast.try_match(|t| match t.token {
+            Token::Literal(Literal::Integer(n)) => Some(n),
+            _ => None,
+        });
+
+        assert_eq!(value, Some(42));
+        assert!(ast.tokens.is_empty());
+    }
+
+    #[test]
+    fn try_match_fails_softly_instead_of_panicking() {
+        let mut ast = ast_with(vec![Token::Literal(Literal::Boolean(true))]);
+
+        let value = ast.try_match(|t| match t.token {
+            Token::Literal(Literal::Integer(n)) => Some(n),
+            _ => None,
+        });
+
+        assert_eq!(value, None);
+    }
+
+    #[test]
+    fn optional_rolls_back_after_a_failed_try_match() {
+        let mut ast = ast_with(vec![Token::Literal(Literal::Boolean(true))]);
+
+        let result = ast.optional(|p| {
+            p.try_match(|t| match t.token {
+                Token::Literal(Literal::Integer(n)) => Some(n),
+                _ => None,
+            })
+        });
+
+        assert_eq!(result, None);
+        assert_eq!(ast.tokens.len(), 1);
+        assert_eq!(ast.tokens[0].token, Token::Literal(Literal::Boolean(true)));
     }
 }

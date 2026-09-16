@@ -49,7 +49,6 @@ impl Ast<'_> {
         self.parse_binary_expr(expr, 0)
     }
 
-    /// Parses unary expressions (e.g. `!condition`)
     pub(crate) fn parse_unary_expr(&mut self) -> Expr {
         if self.consume(&T!(Bang)) {
             return Expr::Unary(ExprUnary {
@@ -100,7 +99,6 @@ impl Ast<'_> {
             Expr::Call(_) |
             // Object instantiation can be called: new Foo().method()
             Expr::Class(_) |
-            // self()/super() call the current/parent constructor
             Expr::Self_ |
             Expr::Super_
         )
@@ -114,7 +112,6 @@ impl Ast<'_> {
 
         match *token {
             Token::Ident(ref ident) => {
-                // `ident => body` is a single-param closure with no parens
                 if self.consume(&T!(FatArrow)) {
                     Expr::Closure(ExprClosure {
                         params: vec![ident.clone()],
@@ -146,14 +143,14 @@ impl Ast<'_> {
             Token::Literal(ref lit) => Expr::Lit(ExprLit { value: lit.clone() }),
             T!(OpenSquareBracket) => self.parse_array(),
             T!(Hash) => self.parse_set(),
-            T!(OpenParen) => {
-                if self.peek_is_closure_params() {
-                    self.parse_closure_body(&T!(CloseParen), None)
-                } else {
-                    self.parse_parenthesized_expr()
-                }
-            }
-            T!(OpenBrace) => self.parse_closure_body(&T!(FatArrow), Some(&T!(CloseBrace))),
+            T!(OpenParen) => match self.optional(Self::try_parse_closure_signature) {
+                Some(params) => Expr::Closure(ExprClosure {
+                    params,
+                    body: Box::new(self.parse_expr()),
+                }),
+                None => self.parse_parenthesized_expr(),
+            },
+            T!(OpenBrace) => self.parse_brace_closure(),
             _ => self.error_in_place("Expected expression"),
         }
     }
@@ -205,8 +202,6 @@ impl Ast<'_> {
         })
     }
 
-    /// Parses an `if (cond) then else otherwise` expression, where each
-    /// branch can be a `{ block }` or a single inline expression.
     pub(crate) fn parse_if_expr(&mut self) -> Expr {
         debug!("Parsing if expression");
         self.expect_token(&T!(OpenParen));
@@ -223,8 +218,6 @@ impl Ast<'_> {
         })
     }
 
-    /// Parses one branch of an `if`/`else`: either a `{ ... }` block or a
-    /// single expression treated as a one-statement block.
     fn parse_branch_block(&mut self) -> Block {
         if self.consume(&T!(OpenBrace)) {
             let block = self.parse_block();
@@ -237,54 +230,46 @@ impl Ast<'_> {
         }
     }
 
-    /// Looks ahead (without consuming) past an already-consumed `(` to
-    /// check whether it opens a closure signature, i.e. `)` or
-    /// `ident (, ident)* )` immediately followed by `=>`.
-    fn peek_is_closure_params(&self) -> bool {
-        let mut idx = 0;
-        match self.tokens.get(idx).map(|t| &t.token) {
-            Some(T!(CloseParen)) => idx += 1,
-            Some(Token::Ident(_)) => {
-                idx += 1;
-                loop {
-                    match self.tokens.get(idx).map(|t| &t.token) {
-                        Some(T!(Comma)) => {
-                            idx += 1;
-                            match self.tokens.get(idx).map(|t| &t.token) {
-                                Some(Token::Ident(_)) => idx += 1,
-                                _ => return false,
-                            }
-                        }
-                        Some(T!(CloseParen)) => {
-                            idx += 1;
-                            break;
-                        }
-                        _ => return false,
-                    }
-                }
-            }
-            _ => return false,
+    /// None means "not a closure signature" (e.g. `(1 + 2)`); optional()
+    /// rolls back whatever this consumed.
+    fn try_parse_closure_signature(&mut self) -> Option<Vec<String>> {
+        let mut params = Vec::new();
+
+        match self.try_match(|t| match t.token {
+            T!(CloseParen) => Some(None),
+            Token::Ident(name) => Some(Some(name)),
+            _ => None,
+        })? {
+            None => return self.closure_signature_if_arrow_follows(params),
+            Some(name) => params.push(name),
         }
-        matches!(self.tokens.get(idx).map(|t| &t.token), Some(T!(FatArrow)))
+
+        loop {
+            match self.try_match(|t| match t.token {
+                T!(Comma) => Some(true),
+                T!(CloseParen) => Some(false),
+                _ => None,
+            })? {
+                false => break,
+                true => params.push(self.try_match(|t| t.token.into_ident())?),
+            }
+        }
+        self.closure_signature_if_arrow_follows(params)
     }
 
-    /// Parses a closure's `params` up to `params_terminator`, then its
-    /// `=> body`, then `closing` (if given). Shared by both closure
-    /// spellings: `(a, b) => body` (params_terminator `)`, no closing) and
-    /// `{ a, b => body }` (params_terminator `=>` itself, closing `}`).
-    fn parse_closure_body(&mut self, params_terminator: &Token, closing: Option<&Token>) -> Expr {
+    fn closure_signature_if_arrow_follows(&mut self, params: Vec<String>) -> Option<Vec<String>> {
+        self.try_match(|t| matches!(t.token, T!(FatArrow)).then_some(()))?;
+        Some(params)
+    }
+
+    fn parse_brace_closure(&mut self) -> Expr {
         let params = self.parse_separated_list(
             |p| p.expect_match("Expected parameter name", |t| t.into_ident()),
             &T!(Comma),
-            params_terminator,
+            &T!(FatArrow),
         );
-        if params_terminator != &T!(FatArrow) {
-            self.expect_token(&T!(FatArrow));
-        }
         let body = Box::new(self.parse_expr());
-        if let Some(closing) = closing {
-            self.expect_token(closing);
-        }
+        self.expect_token(&T!(CloseBrace));
         Expr::Closure(ExprClosure { params, body })
     }
 
