@@ -30,10 +30,17 @@ pub enum BinaryOp {
     And, // &&
     Or,  // ||
 
+    Lt, // <
+    Le, // <=
+    Gt, // >
+    Ge, // >=
+
     Plus,     // +
     Minus,    // -
     Multiply, // *
     Div,      // /
+    Modulo,   // %
+    Pow,      // **
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -78,10 +85,16 @@ impl fmt::Display for BinaryOp {
             BinaryOp::Ne => "!=",
             BinaryOp::And => "&&",
             BinaryOp::Or => "||",
+            BinaryOp::Lt => "<",
+            BinaryOp::Le => "<=",
+            BinaryOp::Gt => ">",
+            BinaryOp::Ge => ">=",
             BinaryOp::Plus => "+",
             BinaryOp::Minus => "-",
             BinaryOp::Multiply => "*",
             BinaryOp::Div => "/",
+            BinaryOp::Modulo => "%",
+            BinaryOp::Pow => "**",
         }
         .bright_red()
         .to_string();

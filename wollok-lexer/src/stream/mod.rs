@@ -5,8 +5,8 @@ use tracing::{debug, info, trace, warn};
 use crate::{
     error::{Result, Src},
     parsers::{
-        CommentParser, IdentifierParser, KeywordParser, LiteralParser, OperatorParser,
-        PunctuationParser, TokenParser, WhitespaceParser,
+        CommentParser, IdentifierParser, KeywordParser, LiteralParser, PunctuationParser,
+        TokenParser, WhitespaceParser,
     },
     token::SpannedToken,
 };
@@ -63,8 +63,7 @@ impl<'t> TokenStream<'t> {
             KeywordParser::parse,     // Keywords antes que identifiers
             LiteralParser::parse,     // Literales (números, strings, booleans)
             IdentifierParser::parse,  // Identificadores
-            PunctuationParser::parse, // Puntuación
-            OperatorParser::parse,    // Operadores
+            PunctuationParser::parse, // Puntuación / operadores
         ))
         .parse_next(&mut self.input);
 

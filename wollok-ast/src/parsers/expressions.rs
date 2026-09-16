@@ -5,14 +5,14 @@
 /// - Assignment expressions
 /// - Field access expressions
 use tracing::{debug, trace};
-use wollok_common::ast::BinaryOp;
+use wollok_common::ast::{BinaryOp, UnaryOp};
 use wollok_lexer::{
     macros::{T, kw},
     token::Token,
 };
 
 use crate::{
-    expr::{Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprLit},
+    expr::{Expr, ExprAssign, ExprBinary, ExprCall, ExprField, ExprLit, ExprUnary},
     source::Ast,
 };
 
@@ -41,8 +41,19 @@ impl Ast<'_> {
 
     /// Parses primary expressions (literals, identifiers, collections, etc.)
     pub(crate) fn parse_primary_expr(&mut self) -> Expr {
-        let expr = self.parse_postfix_expr();
+        let expr = self.parse_unary_expr();
         self.parse_binary_expr(expr, 0)
+    }
+
+    /// Parses unary expressions (e.g. `!condition`)
+    pub(crate) fn parse_unary_expr(&mut self) -> Expr {
+        if self.consume(&T!(Bang)) {
+            return Expr::Unary(ExprUnary {
+                op: UnaryOp::Not,
+                expr: Box::new(self.parse_unary_expr()),
+            });
+        }
+        self.parse_postfix_expr()
     }
 
     /// Parses postfix expressions (function calls, field access, etc.)
@@ -123,7 +134,7 @@ impl Ast<'_> {
 
             self.advance(); // consume operator
             let next_prec = if right_assoc { prec } else { prec + 1 };
-            let rhs_atomic = self.parse_postfix_expr();
+            let rhs_atomic = self.parse_unary_expr();
             let rhs = self.parse_binary_expr(rhs_atomic, next_prec);
 
             lhs = Expr::Binary(ExprBinary {
@@ -140,10 +151,20 @@ impl Ast<'_> {
         self.peek().and_then(|peeked| {
             let token = &peeked.token.token;
             let result = match token {
-                T!(Multiply) => Some((BinaryOp::Multiply, 4, false)),
-                T!(Div) => Some((BinaryOp::Div, 4, false)),
-                T!(Plus) => Some((BinaryOp::Plus, 2, false)),
-                T!(Minus) => Some((BinaryOp::Minus, 2, false)),
+                T!(Pow) => Some((BinaryOp::Pow, 6, true)),
+                T!(Multiply) => Some((BinaryOp::Multiply, 5, false)),
+                T!(Div) => Some((BinaryOp::Div, 5, false)),
+                T!(Modulo) => Some((BinaryOp::Modulo, 5, false)),
+                T!(Plus) => Some((BinaryOp::Plus, 4, false)),
+                T!(Minus) => Some((BinaryOp::Minus, 4, false)),
+                T!(Lt) => Some((BinaryOp::Lt, 3, false)),
+                T!(Le) => Some((BinaryOp::Le, 3, false)),
+                T!(Gt) => Some((BinaryOp::Gt, 3, false)),
+                T!(Ge) => Some((BinaryOp::Ge, 3, false)),
+                T!(Eq) => Some((BinaryOp::Eq, 2, false)),
+                T!(Ne) => Some((BinaryOp::Ne, 2, false)),
+                T!(And) => Some((BinaryOp::And, 1, false)),
+                T!(Or) => Some((BinaryOp::Or, 0, false)),
                 _ => None,
             };
             peeked.recover();

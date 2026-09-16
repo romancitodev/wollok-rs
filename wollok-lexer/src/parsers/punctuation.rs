@@ -17,11 +17,18 @@ impl TokenParser for PunctuationParser {
             "!=".value(Punctuation::Ne),
             "&&".value(Punctuation::And),
             "||".value(Punctuation::Or),
+            "<=".value(Punctuation::Le),
+            ">=".value(Punctuation::Ge),
+            "**".value(Punctuation::Pow),
             // Operadores aritméticos
             "+".value(Punctuation::Plus),
             "-".value(Punctuation::Minus),
             "*".value(Punctuation::Multiply),
             "/".value(Punctuation::Div),
+            "%".value(Punctuation::Modulo),
+            // Comparación de un caracter
+            "<".value(Punctuation::Lt),
+            ">".value(Punctuation::Gt),
             // // Operadores bitwise
             "|".value(Punctuation::BitOr),
             "&".value(Punctuation::BitAnd),

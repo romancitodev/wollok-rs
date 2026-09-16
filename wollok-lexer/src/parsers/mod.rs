@@ -20,7 +20,6 @@ pub mod comments;
 pub mod identifiers;
 pub mod keywords;
 pub mod literals;
-pub mod operators;
 pub mod punctuation;
 pub mod whitespace;
 
@@ -28,6 +27,5 @@ pub use comments::CommentParser;
 pub use identifiers::IdentifierParser;
 pub use keywords::KeywordParser;
 pub use literals::LiteralParser;
-pub use operators::OperatorParser;
 pub use punctuation::PunctuationParser;
 pub use whitespace::WhitespaceParser;
