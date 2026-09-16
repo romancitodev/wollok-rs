@@ -148,12 +148,12 @@ impl Ast<'_> {
             T!(Hash) => self.parse_set(),
             T!(OpenParen) => {
                 if self.peek_is_closure_params() {
-                    self.parse_closure_after_params()
+                    self.parse_closure_body(&T!(CloseParen), None)
                 } else {
                     self.parse_parenthesized_expr()
                 }
             }
-            T!(OpenBrace) => self.parse_brace_closure_expr(),
+            T!(OpenBrace) => self.parse_closure_body(&T!(FatArrow), Some(&T!(CloseBrace))),
             _ => self.error_in_place("Expected expression"),
         }
     }
@@ -268,31 +268,23 @@ impl Ast<'_> {
         matches!(self.tokens.get(idx).map(|t| &t.token), Some(T!(FatArrow)))
     }
 
-    /// Parses `params) => body` right after the opening `(`, once
-    /// `peek_is_closure_params` confirmed the shape.
-    fn parse_closure_after_params(&mut self) -> Expr {
+    /// Parses a closure's `params` up to `params_terminator`, then its
+    /// `=> body`, then `closing` (if given). Shared by both closure
+    /// spellings: `(a, b) => body` (params_terminator `)`, no closing) and
+    /// `{ a, b => body }` (params_terminator `=>` itself, closing `}`).
+    fn parse_closure_body(&mut self, params_terminator: &Token, closing: Option<&Token>) -> Expr {
         let params = self.parse_separated_list(
             |p| p.expect_match("Expected parameter name", |t| t.into_ident()),
             &T!(Comma),
-            &T!(CloseParen),
+            params_terminator,
         );
-        self.expect_token(&T!(FatArrow));
-        Expr::Closure(ExprClosure {
-            params,
-            body: Box::new(self.parse_expr()),
-        })
-    }
-
-    /// Parses a `{ params => body }` closure literal (comma-separated
-    /// params, no parens; body is a single expression).
-    fn parse_brace_closure_expr(&mut self) -> Expr {
-        let params = self.parse_separated_list(
-            |p| p.expect_match("Expected parameter name", |t| t.into_ident()),
-            &T!(Comma),
-            &T!(FatArrow),
-        );
+        if params_terminator != &T!(FatArrow) {
+            self.expect_token(&T!(FatArrow));
+        }
         let body = Box::new(self.parse_expr());
-        self.expect_token(&T!(CloseBrace));
+        if let Some(closing) = closing {
+            self.expect_token(closing);
+        }
         Expr::Closure(ExprClosure { params, body })
     }
 
