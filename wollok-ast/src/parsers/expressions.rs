@@ -65,6 +65,9 @@ impl Ast<'_> {
         let mut expr = self.parse_atomic_expr();
 
         loop {
+            if self.next_significant_is(&T!(Dot)) {
+                self.skip_trivia();
+            }
             if self.check(&T!(OpenParen)) && Self::is_callable(&expr) {
                 // Function call: expr() - but only if expr is callable
                 let args = self.parse_params();
@@ -115,7 +118,7 @@ impl Ast<'_> {
                 if self.consume(&T!(FatArrow)) {
                     Expr::Closure(ExprClosure {
                         params: vec![ident.clone()],
-                        body: Box::new(self.parse_expr()),
+                        body: self.parse_expr_or_block(),
                     })
                 } else {
                     Expr::Field(ExprField {
@@ -161,7 +164,7 @@ impl Ast<'_> {
             T!(OpenParen) => match self.optional(Self::try_parse_closure_signature) {
                 Some(params) => Expr::Closure(ExprClosure {
                     params,
-                    body: Box::new(self.parse_expr()),
+                    body: self.parse_expr_or_block(),
                 }),
                 None => self.parse_parenthesized_expr(),
             },
@@ -223,8 +226,8 @@ impl Ast<'_> {
         let condition = Box::new(self.parse_expr());
         self.expect_token(&T!(CloseParen));
 
-        let then = self.parse_branch_block();
-        let otherwise = self.consume(&kw!(Else)).then(|| self.parse_branch_block());
+        let then = self.parse_expr_or_block();
+        let otherwise = self.consume(&kw!(Else)).then(|| self.parse_expr_or_block());
 
         Expr::If(ExprIf {
             condition,
@@ -233,7 +236,8 @@ impl Ast<'_> {
         })
     }
 
-    fn parse_branch_block(&mut self) -> Block {
+    /// A `{ block }` or a single expression treated as a one-statement block.
+    fn parse_expr_or_block(&mut self) -> Block {
         if self.consume(&T!(OpenBrace)) {
             let block = self.parse_block();
             self.expect_token(&T!(CloseBrace));
@@ -277,15 +281,29 @@ impl Ast<'_> {
         Some(params)
     }
 
+    /// `{ params => body }` when a `params =>` prefix is actually there,
+    /// otherwise a 0-param closure whose body is everything up to `}` —
+    /// covers both `{ n => n.even() }` and a bare block like `{ 2 + 5 }`
+    /// or a multi-statement `{ a = a + 1\nreturn a }`.
     fn parse_brace_closure(&mut self) -> Expr {
-        let params = self.parse_separated_list(
-            |p| p.expect_match("Expected parameter name", |t| t.into_ident()),
-            &T!(Comma),
-            &T!(FatArrow),
-        );
-        let body = Box::new(self.parse_expr());
+        let params = self.optional(Self::try_parse_arrow_params).unwrap_or_default();
+        let body = self.parse_block();
         self.expect_token(&T!(CloseBrace));
         Expr::Closure(ExprClosure { params, body })
+    }
+
+    fn try_parse_arrow_params(&mut self) -> Option<Vec<String>> {
+        let mut params = vec![self.try_match(|t| t.token.into_ident())?];
+        loop {
+            match self.try_match(|t| match t.token {
+                T!(Comma) => Some(true),
+                T!(FatArrow) => Some(false),
+                _ => None,
+            })? {
+                false => return Some(params),
+                true => params.push(self.try_match(|t| t.token.into_ident())?),
+            }
+        }
     }
 
     /// Parses expressions enclosed in parentheses

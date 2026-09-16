@@ -80,7 +80,7 @@ pub struct ExprCall {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExprClosure {
     pub params: Vec<String>, // nombres de parámetros
-    pub body: Box<Expr>,
+    pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]

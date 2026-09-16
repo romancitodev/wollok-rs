@@ -234,6 +234,7 @@ impl<'i> Ast<'i> {
         terminator: &Token,
     ) -> Vec<T> {
         let mut elements = Vec::new();
+        self.skip_trivia();
 
         // Check for empty list
         if self.check(terminator) {
@@ -243,15 +244,18 @@ impl<'i> Ast<'i> {
 
         // Parse first element
         elements.push(element_parser(self));
+        self.skip_trivia();
 
         // Parse remaining elements
         while self.consume(separator) {
+            self.skip_trivia();
             // Check for trailing separator
             if self.check(terminator) {
                 self.consume(terminator);
-                break;
+                return elements;
             }
             elements.push(element_parser(self));
+            self.skip_trivia();
         }
 
         // Consume terminator
@@ -272,6 +276,15 @@ impl<'i> Ast<'i> {
             &T!(Comma),
             terminator,
         )
+    }
+
+    /// Looks past any comments/newlines (without consuming anything) to see
+    /// whether the next real token is `expected`.
+    pub fn next_significant_is(&self, expected: &Token) -> bool {
+        self.tokens
+            .iter()
+            .find(|t| !matches!(t.token, Token::Comment(_) | T!(Newline)))
+            .is_some_and(|t| t.token == *expected)
     }
 
     /// Unified whitespace and comment handling
