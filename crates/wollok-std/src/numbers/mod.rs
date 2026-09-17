@@ -20,12 +20,18 @@ pub fn install(table: &mut NativeTable) {
   table.register(PrimitiveKind::Int, ">=", 1, ge);
   table.register(PrimitiveKind::Int, "==", 1, eq);
   table.register(PrimitiveKind::Int, "!=", 1, ne);
+  table.register(PrimitiveKind::Int, "toString", 0, to_string);
 }
 
 fn receiver(this: Value) -> i64 {
   this
     .as_int()
     .expect("registered only for Value::Int receivers")
+}
+
+fn to_string(vm: &mut Vm, _program: &Program, this: Value, _args: &[Value]) -> Value {
+  let s = receiver(this).to_string();
+  Value::from(vm.strings.intern(&s))
 }
 
 /// # Panics

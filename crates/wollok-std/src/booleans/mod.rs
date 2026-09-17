@@ -8,6 +8,15 @@ use wollok_vm::vm::Vm;
 
 pub fn install(table: &mut NativeTable) {
   table.register(PrimitiveKind::Bool, "negate", 0, negate);
+  table.register(PrimitiveKind::Bool, "toString", 0, to_string);
+}
+
+fn to_string(vm: &mut Vm, _program: &Program, this: Value, _args: &[Value]) -> Value {
+  let s = this
+    .as_bool()
+    .expect("registered only for Value::Bool receivers")
+    .to_string();
+  Value::from(vm.strings.intern(&s))
 }
 
 fn negate(_vm: &mut Vm, _program: &Program, this: Value, _args: &[Value]) -> Value {
