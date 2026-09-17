@@ -1,5 +1,7 @@
 //! Shared test helpers for every native module in this crate.
 
+/// # Panics
+/// If `value` isn't a `Str` or its text doesn't match `expected`.
 #[track_caller]
 pub fn assert_str(vm: &wollok_vm::vm::Vm, value: wollok_vm::value::Value, expected: &str) {
   let idx = value.as_str_idx().expect("expected a String result");

@@ -17,8 +17,8 @@ fn build_class_table(class_count: usize, methods_per_class: usize) -> (ClassTabl
 
     for method_idx in 0..methods_per_class {
       methods.insert(
-        MethodNameIdx(method_idx as u32),
-        MethodRef((class_idx * methods_per_class + method_idx) as u32),
+        MethodNameIdx(u32::try_from(method_idx).unwrap()),
+        MethodRef(u32::try_from(class_idx * methods_per_class + method_idx).unwrap()),
       );
     }
 
@@ -34,7 +34,7 @@ fn bench_lookup(c: &mut Criterion) {
     let mut i = 0usize;
     b.iter(|| {
       let class = ids[i % ids.len()];
-      let selector = MethodNameIdx((i % 16) as u32);
+      let selector = MethodNameIdx(u32::try_from(i % 16).unwrap());
 
       i = i.wrapping_add(1);
       black_box(classes.lookup(black_box(class), black_box(selector)));

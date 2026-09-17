@@ -97,6 +97,14 @@ impl<'a> ClassLike<'a> {
 /// cache slots and global slots on `vm` for every send/singleton `object`
 /// compiled, so `vm` must be the same `Vm` the resulting program later
 /// runs on.
+///
+/// # Errors
+/// If `scope` uses AST shapes not supported yet, an undefined name, or a
+/// duplicate class/object name.
+///
+/// # Panics
+/// If a method has more than `u32::MAX` params (not a realistic program).
+#[allow(clippy::too_many_lines)] // one phase per section: builtins, classes, ctors, top-level
 pub fn compile(scope: &Scope, vm: &mut Vm) -> Result<Compiled, CompileError> {
   // Builtins (console, ...) compile like ordinary user source, just
   // parsed first so their objects come before the user's own.
@@ -175,7 +183,7 @@ pub fn compile(scope: &Scope, vm: &mut Vm) -> Result<Compiled, CompileError> {
 
     let class_id = program.classes.define(
       item.name().to_owned(),
-      info.fields.len() as u32,
+      u32::try_from(info.fields.len()).unwrap(),
       ctor,
       vtable,
     );
@@ -428,7 +436,7 @@ impl MethodCompiler<'_> {
             self.emit(Instr::PushNull);
           }
         }
-        other => {
+        other @ Stmt::Item(_) => {
           return Err(CompileError::Unsupported(format!(
             "statement inside a method body: {other:?}"
           )));
@@ -441,7 +449,7 @@ impl MethodCompiler<'_> {
   /// Every case here must leave exactly one value on the stack.
   fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
     match expr {
-      Expr::Lit(lit) => self.compile_lit(&lit.value)?,
+      Expr::Lit(lit) => self.compile_lit(&lit.value),
       Expr::Self_ => {
         self.emit(Instr::PushSelf);
       }
@@ -468,7 +476,7 @@ impl MethodCompiler<'_> {
     Ok(())
   }
 
-  fn compile_lit(&mut self, lit: &Literal) -> Result<(), CompileError> {
+  fn compile_lit(&mut self, lit: &Literal) {
     match lit {
       Literal::Integer(n) => {
         let idx = ConstIdx(u32::try_from(self.consts.len()).unwrap());
@@ -497,7 +505,6 @@ impl MethodCompiler<'_> {
         self.emit(Instr::PushConst(const_idx));
       }
     }
-    Ok(())
   }
 
   /// A bare `name` (self field/local) or `base.name` (getter send).

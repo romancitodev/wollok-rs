@@ -43,6 +43,7 @@ impl Vm {
   /// # Panics
   /// On any bytecode invariant violation, and on the instructions not
   /// wired yet (`NewArray`, `NewSet`, `NewClosure`, try/catch, `SendSuper`).
+  #[allow(clippy::too_many_lines)] // one match arm per opcode, splitting it up would hurt more than help
   pub fn run_method(
     &mut self,
     program: &Program,
