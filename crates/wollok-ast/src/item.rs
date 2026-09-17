@@ -62,6 +62,7 @@ pub enum Prefix {
   Fallible,
   OverrideFallible,
   Abstract,
+  Native,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -307,6 +308,7 @@ impl Display for ItemPrefixedMethod {
       Prefix::Fallible => write!(f, "{}", "fallible ".magenta()),
       Prefix::OverrideFallible => write!(f, "{}", "override fallible ".magenta()),
       Prefix::Abstract => write!(f, "{}", "abstract ".magenta()),
+      Prefix::Native => write!(f, "{}", "native ".magenta()),
     }?;
     write!(f, "{}", self.method)
   }

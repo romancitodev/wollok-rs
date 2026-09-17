@@ -60,6 +60,18 @@ impl Ast<'_> {
           inline: false,
         },
       })
+    } else if self.consume(&kw!(Native)) {
+      info!("Entering on native method");
+      self.expect_token(&kw!(Method));
+      let signature = self.parse_method_signature();
+      Item::PrefixedMethod(ItemPrefixedMethod {
+        prefix: Prefix::Native,
+        method: ItemMethod {
+          signature,
+          body: None,
+          inline: false,
+        },
+      })
     } else {
       self.parse_item()
     }
@@ -269,7 +281,7 @@ impl Ast<'_> {
       }
 
       // Parse item
-      let stmt = self.parse_item();
+      let stmt = self.parse_class_item();
       Self::push_to_node(stmt, &mut body);
     }
 

@@ -264,6 +264,7 @@ pub enum Keyword {
   Abstract,
   With,
   Catch,
+  Native,
 }
 
 impl fmt::Display for Keyword {
@@ -293,6 +294,7 @@ impl fmt::Display for Keyword {
       Keyword::Abstract => "abstract",
       Keyword::With => "with",
       Keyword::Catch => "catch",
+      Keyword::Native => "native",
     };
     write!(f, "{keyword}")
   }

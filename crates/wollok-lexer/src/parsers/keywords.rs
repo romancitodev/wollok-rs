@@ -51,6 +51,7 @@ impl TokenParser for KeywordParser {
       keyword("mixin").value(Keyword::Mixin),
       keyword("with").value(Keyword::With),
       keyword("catch").value(Keyword::Catch),
+      keyword("native").value(Keyword::Native),
     ])
     .with_span()
     .map(|(keyword, span)| Some(SpannedToken::new(Span::from(span), Token::Keyword(keyword))))
