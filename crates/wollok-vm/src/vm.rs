@@ -13,12 +13,14 @@ pub struct Vm {
   pub caches: InlineCacheTable,
   /// One slot per top-level singleton `object`, reserved at compile time.
   pub globals: Vec<Value>,
-  /// Runtime string storage — see `crate::strings::StringTable` for why
-  /// this lives here and not on `Program`.
+  /// Runtime string storage, see `crate::strings::StringTable`.
   pub strings: StringTable,
-  /// Native methods on primitives, filled in once (typically by
-  /// `wollok_std::install`) right after `Vm::new()`.
+  /// Native methods, filled in by `wollok_std::install` right after
+  /// `Vm::new()`.
   pub natives: native::NativeTable,
+  /// Wollok source for builtin singletons (`console`, ...), compiled
+  /// alongside the user's own source. See `wollok-std`'s `console` module.
+  pub builtin_sources: Vec<&'static str>,
 }
 
 impl Vm {
@@ -108,42 +110,38 @@ impl Vm {
           }
           let receiver_v = frame.pop();
 
-          let result = match receiver_v.as_object() {
-            Some(obj) => {
-              let class = self.heap.class_of(obj);
-              if let Some(method_ref) = self.caches.get(*cache_slot).lookup(class) {
-                self.run_method(program, method_ref, receiver_v, call_args)
-              } else if let Some(method_ref) = program.classes.lookup(class, *method_name) {
-                self.caches.get_mut(*cache_slot).store(class, method_ref);
-                self.run_method(program, method_ref, receiver_v, call_args)
-              } else {
-                // The class itself has nothing for this
-                // selector — before giving up, try the
-                // `Object` defaults every object falls
-                // back to (`toString`, ...). Not real
-                // inheritance (see docs/backlog.md item 4),
-                // just the one native fallback bucket.
-                let selector_name = program.selectors.name_of(*method_name);
-                match self
-                  .natives
-                  .lookup(native::PrimitiveKind::Object, selector_name, *arg_count)
-                {
-                  Some(method) => method(self, program, receiver_v, &call_args),
-                  None => panic!(
-                    "{} does not understand #{}",
-                    program.classes.name_of(class),
-                    selector_name
-                  ),
-                }
+          let result = if let Some(obj) = receiver_v.as_object() {
+            let class = self.heap.class_of(obj);
+            if let Some(method_ref) = self.caches.get(*cache_slot).lookup(class) {
+              self.run_method(program, method_ref, receiver_v, call_args)
+            } else if let Some(method_ref) = program.classes.lookup(class, *method_name) {
+              self.caches.get_mut(*cache_slot).store(class, method_ref);
+              self.run_method(program, method_ref, receiver_v, call_args)
+            } else {
+              // No vtable entry: try a native pinned to this class,
+              // then the generic Object fallback. Not inheritance,
+              // see docs/backlog.md item 4.
+              let selector_name = program.selectors.name_of(*method_name);
+              let found = self
+                .natives
+                .lookup_class(program.classes.name_of(class), selector_name, *arg_count)
+                .or_else(|| {
+                  self
+                    .natives
+                    .lookup(native::PrimitiveKind::Object, selector_name, *arg_count)
+                });
+              match found {
+                Some(method) => method(self, program, receiver_v, &call_args),
+                None => panic!(
+                  "{} does not understand #{}",
+                  program.classes.name_of(class),
+                  selector_name
+                ),
               }
             }
-            // Primitives are never heap objects (see
-            // docs/vm-design.md) — no vtable/inline cache for
-            // them, straight to the native method table.
-            None => {
-              let selector_name = program.selectors.name_of(*method_name);
-              native::dispatch(self, program, selector_name, receiver_v, &call_args)
-            }
+          } else {
+            let selector_name = program.selectors.name_of(*method_name);
+            native::dispatch(self, program, selector_name, receiver_v, &call_args)
           };
           frame.push(result);
         }
@@ -178,11 +176,8 @@ impl Vm {
     }
   }
 
-  /// Sends `selector` to `receiver` — for native methods (`wollok-std`)
-  /// that need to call back into user code, e.g. a `toString` that has
-  /// to run whatever a class actually overrides, falling back to the
-  /// `Object` default otherwise. Unlike a bytecode `Send`, there's no
-  /// call site to cache against, so this always resolves from scratch.
+  /// Sends `selector` to `receiver`, for native methods calling back
+  /// into user code. No cache, always resolves from scratch.
   ///
   /// # Panics
   /// If `receiver` doesn't understand `selector`/this arity.
@@ -204,10 +199,15 @@ impl Vm {
       if let Some(method_ref) = overridden {
         return self.run_method(program, method_ref, receiver, args);
       }
-      return match self
+      let found = self
         .natives
-        .lookup(native::PrimitiveKind::Object, selector, arity)
-      {
+        .lookup_class(program.classes.name_of(class), selector, arity)
+        .or_else(|| {
+          self
+            .natives
+            .lookup(native::PrimitiveKind::Object, selector, arity)
+        });
+      return match found {
         Some(method) => method(self, program, receiver, &args),
         None => panic!(
           "{} does not understand #{}",

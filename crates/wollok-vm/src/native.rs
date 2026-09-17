@@ -1,38 +1,20 @@
-//! The *mechanism* for native (Rust-implemented) methods on primitive
-//! receivers — `Int`, `Float`, `Bool`, `Str` — plus a small fallback
-//! bucket, `PrimitiveKind::Object`, for defaults every heap object gets
-//! when its own class doesn't override them (`toString`, ...). Primitives
-//! are never heap objects (see "Principio: los primitivos nunca son
-//! objetos de heap" in `docs/vm-design.md`), so there's no
-//! vtable/inline-cache lookup for them: `Send` tries [`dispatch`] first,
-//! whenever the receiver isn't a `Value::Object`. For `Object` receivers,
-//! `Send` still tries the class's own vtable first — `PrimitiveKind::Object`
-//! is only ever consulted once that misses (see `vm.rs`), it is **not**
-//! real inheritance/linearization (`inherits`/`with`/`super` chains are
-//! still unimplemented — see `docs/backlog.md` item 4).
-//!
-//! This module deliberately has **no method implementations** — those
-//! live in the `wollok-std` crate, one function per method, registered
-//! into a fresh `Vm`'s [`NativeTable`] via `wollok_std::install(&mut vm)`
-//! before anything runs. `wollok-vm` only needs to know how to call a
-//! registered method, not what any of them do — that split is what lets
-//! the standard library grow (and get reorganized, tested, reviewed) on
-//! its own, without ever touching this crate.
+//! Native method mechanism: `Int`/`Float`/`Bool`/`Str` primitives, plus
+//! two fallback buckets for `Value::Object` (generic `toString`-style
+//! defaults, and per-class-name natives like `console`). No
+//! implementations here, those live in `wollok-std`, registered into a
+//! `Vm` via `wollok_std::install`. Not real inheritance, see
+//! `docs/backlog.md` item 4.
 
 use crate::program::Program;
 use crate::value::Value;
 use crate::vm::Vm;
 
-/// A single native method's implementation. Takes the receiver by value
-/// (primitives are `Copy`) and the already-evaluated arguments. Gets
-/// `&Program` too — a default `toString` on `Object` needs it (to find
-/// the receiver's class name), and a method that wants to call back into
-/// user code (via `Vm::send`) needs it to resolve/run that code.
+/// A native method implementation: receiver by value, evaluated args,
+/// plus `&Program` (needed for the default `toString` and for `Vm::send`).
 pub type NativeFn = fn(&mut Vm, &Program, Value, &[Value]) -> Value;
 
-/// The "kinds" a native method can be registered against — the fiction
-/// that `Int`/`Float`/`Bool`/`Str` "have a class" (see `vm-design.md`),
-/// without an actual entry in `ClassTable`.
+/// What a native method can be registered against. No real `ClassTable`
+/// entry for these, see `vm-design.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveKind {
   Int,
@@ -46,10 +28,7 @@ pub enum PrimitiveKind {
 }
 
 impl PrimitiveKind {
-  /// `None` for `Null`/`Object` — they don't bypass class-based dispatch
-  /// the way a true primitive does (see `vm.rs`'s `Send`). Use
-  /// `PrimitiveKind::Object` explicitly at the one call site that wants
-  /// the object-defaults bucket instead.
+  /// `None` for `Null`/`Object`, they don't bypass class-based dispatch.
   #[must_use]
   pub fn of(value: &Value) -> Option<Self> {
     match value {
@@ -62,24 +41,44 @@ impl PrimitiveKind {
   }
 }
 
+/// How many arguments a registered native method accepts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Arity {
+  Exact(u8),
+  /// Matches any argument count (e.g. `console.println`).
+  Any,
+}
+
+impl Arity {
+  fn matches(self, arity: u8) -> bool {
+    match self {
+      Arity::Exact(a) => a == arity,
+      Arity::Any => true,
+    }
+  }
+}
+
+/// A `PrimitiveKind`, or a class name (a builtin singleton's `native
+/// method`, resolved by name since its `ClassId` isn't known yet at
+/// registration time).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum Key {
+  Primitive(PrimitiveKind),
+  ClassName(&'static str),
+}
+
 #[derive(Debug)]
 struct Entry {
-  kind: PrimitiveKind,
+  key: Key,
   name: &'static str,
-  arity: u8,
+  arity: Arity,
   method: NativeFn,
 }
 
-/// Every native method available at runtime, keyed by `(kind, selector,
-/// arity)` — `wollok-std` (or anyone else) fills this in once via
-/// [`NativeTable::register`], `Send` only ever calls [`NativeTable::lookup`].
+/// Every native method, keyed by `(key, selector, arity)`.
 ///
-/// ponytail: linear scan per lookup. Fine for a stdlib with a few dozen
-/// methods per kind; if this ever grows into the hundreds, switch to
-/// `HashMap<PrimitiveKind, HashMap<(&'static str, u8), NativeFn>>` (a flat
-/// `HashMap` keyed by the full tuple doesn't work — `&'static str` doesn't
-/// implement `Borrow` against a shorter-lived lookup `&str` once it's
-/// nested inside a tuple).
+/// ponytail: linear scan per lookup, fine at stdlib scale. Switch to a
+/// nested `HashMap` if this ever grows into the hundreds.
 #[derive(Debug, Default)]
 pub struct NativeTable {
   entries: Vec<Entry>,
@@ -88,32 +87,77 @@ pub struct NativeTable {
 impl NativeTable {
   pub fn register(&mut self, kind: PrimitiveKind, name: &'static str, arity: u8, method: NativeFn) {
     self.entries.push(Entry {
-      kind,
+      key: Key::Primitive(kind),
       name,
-      arity,
+      arity: Arity::Exact(arity),
+      method,
+    });
+  }
+
+  /// Pins a native method to a class by name, for a builtin singleton's
+  /// `native method` (`console`).
+  pub fn register_for_class(
+    &mut self,
+    class_name: &'static str,
+    name: &'static str,
+    arity: u8,
+    method: NativeFn,
+  ) {
+    self.entries.push(Entry {
+      key: Key::ClassName(class_name),
+      name,
+      arity: Arity::Exact(arity),
+      method,
+    });
+  }
+
+  /// Same as [`Self::register_for_class`], but matches any argument count.
+  pub fn register_variadic_for_class(
+    &mut self,
+    class_name: &'static str,
+    name: &'static str,
+    method: NativeFn,
+  ) {
+    self.entries.push(Entry {
+      key: Key::ClassName(class_name),
+      name,
+      arity: Arity::Any,
       method,
     });
   }
 
   #[must_use]
   pub fn lookup(&self, kind: PrimitiveKind, selector: &str, arity: u8) -> Option<NativeFn> {
+    self.lookup_key(Key::Primitive(kind), selector, arity)
+  }
+
+  #[must_use]
+  pub fn lookup_class(&self, class_name: &str, selector: &str, arity: u8) -> Option<NativeFn> {
     self
       .entries
       .iter()
-      .find(|e| e.kind == kind && e.arity == arity && e.name == selector)
+      .find(|e| {
+        matches!(e.key, Key::ClassName(n) if n == class_name)
+          && e.arity.matches(arity)
+          && e.name == selector
+      })
+      .map(|e| e.method)
+  }
+
+  fn lookup_key(&self, key: Key, selector: &str, arity: u8) -> Option<NativeFn> {
+    self
+      .entries
+      .iter()
+      .find(|e| e.key == key && e.arity.matches(arity) && e.name == selector)
       .map(|e| e.method)
   }
 }
 
 /// Looks up and calls a native method on `receiver`. Only for true
-/// primitives — an `Object` receiver never reaches this (see `vm.rs`'s
-/// `Send`, which tries the class's own vtable first and only falls back to
-/// `PrimitiveKind::Object` itself, not through here).
+/// primitives, an `Object` receiver never reaches this.
 ///
 /// # Panics
-/// If `receiver`'s kind has no method registered for `selector`/this
-/// arity — same "doesn't understand" contract as a `Send` to an object
-/// whose class has no matching method.
+/// If `receiver`'s kind has no method registered for `selector`/this arity.
 pub fn dispatch(
   vm: &mut Vm,
   program: &Program,
@@ -134,9 +178,8 @@ pub fn dispatch(
   }
 }
 
-/// Human-readable receiver name for "X does not understand #y" panics —
-/// covers `Null`/`Object` too, unlike `PrimitiveKind`, since both can also
-/// reach a `Send` that finds nothing.
+/// Human-readable receiver name for "X does not understand #y" panics.
+/// Covers `Null`/`Object` too, unlike `PrimitiveKind`.
 #[must_use]
 pub fn receiver_kind_name(value: &Value) -> &'static str {
   match value {
@@ -181,6 +224,32 @@ mod tests {
 
     assert!(table.lookup(PrimitiveKind::Object, "toString", 0).is_some());
     assert!(table.lookup(PrimitiveKind::Int, "toString", 0).is_none());
+  }
+
+  #[test]
+  fn class_keyed_methods_are_pinned_to_that_exact_class_name() {
+    let mut table = NativeTable::default();
+    table.register_for_class("console", "println", 1, always_42);
+
+    assert!(table.lookup_class("console", "println", 1).is_some());
+    assert!(
+      table.lookup_class("Bird", "println", 1).is_none(),
+      "a different class must not see console's native method"
+    );
+    assert!(
+      table.lookup(PrimitiveKind::Object, "println", 1).is_none(),
+      "a class-keyed method must not leak into the generic Object bucket"
+    );
+  }
+
+  #[test]
+  fn variadic_class_keyed_methods_match_any_arity() {
+    let mut table = NativeTable::default();
+    table.register_variadic_for_class("console", "println", always_42);
+
+    assert!(table.lookup_class("console", "println", 0).is_some());
+    assert!(table.lookup_class("console", "println", 1).is_some());
+    assert!(table.lookup_class("console", "println", 5).is_some());
   }
 
   #[test]

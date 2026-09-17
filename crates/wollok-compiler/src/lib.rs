@@ -21,7 +21,7 @@ use wollok_ast::{
   item::{Item, ItemClass, ItemObject},
 };
 use wollok_common::ast::{BinaryOp, UnaryOp};
-use wollok_lexer::token::Literal;
+use wollok_lexer::{lexer::TokenStream, token::Literal};
 use wollok_vm::{
   bytecode::{ConstIdx, GlobalIdx, Instr, InstrIdx, SlotIdx},
   dispatch::MethodRef,
@@ -36,7 +36,7 @@ use wollok_vm::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompileError {
   /// An AST shape the VM has no bytecode/value representation for yet.
-  Unsupported(&'static str),
+  Unsupported(String),
   UndefinedName(String),
   DuplicateClass(String),
 }
@@ -98,6 +98,12 @@ impl<'a> ClassLike<'a> {
 /// compiled, so `vm` must be the same `Vm` the resulting program later
 /// runs on.
 pub fn compile(scope: &Scope, vm: &mut Vm) -> Result<Compiled, CompileError> {
+  // Builtins (console, ...) compile like ordinary user source, just
+  // parsed first so their objects come before the user's own.
+  let builtins_src = vm.builtin_sources.join("\n");
+  let builtins_scope = Scope::from_tokens("<builtins>", TokenStream::new(&builtins_src));
+  let scope: Vec<Stmt> = builtins_scope.iter().chain(scope.iter()).cloned().collect();
+
   let class_like_items: Vec<ClassLike> = scope
     .iter()
     .filter_map(|stmt| match stmt {
@@ -119,14 +125,18 @@ pub fn compile(scope: &Scope, vm: &mut Vm) -> Result<Compiled, CompileError> {
         Item::Method(m) => m,
         Item::PrefixedMethod(prefixed) => &prefixed.method,
         Item::Const(_) | Item::Let(_) | Item::Property(_) => continue,
-        _ => return Err(CompileError::Unsupported("item inside a class/object body")),
+        other => {
+          return Err(CompileError::Unsupported(format!(
+            "item inside a class/object body: {other:?}"
+          )));
+        }
       };
-      // Abstract methods have no body; nothing to run (yet).
+      // Abstract/native methods have no body; nothing to run (yet).
       let Some(body) = &method_item.body else {
         continue;
       };
       let arity = u8::try_from(method_item.signature.params.len())
-        .map_err(|_| CompileError::Unsupported("more than 255 params"))?;
+        .map_err(|_| CompileError::Unsupported("more than 255 params".to_string()))?;
 
       let mut mc = MethodCompiler {
         selectors: &mut program.selectors,
@@ -418,7 +428,11 @@ impl MethodCompiler<'_> {
             self.emit(Instr::PushNull);
           }
         }
-        _ => return Err(CompileError::Unsupported("statement inside a method body")),
+        other => {
+          return Err(CompileError::Unsupported(format!(
+            "statement inside a method body: {other:?}"
+          )));
+        }
       }
     }
     Ok(())
@@ -444,8 +458,12 @@ impl MethodCompiler<'_> {
       Expr::Return(ret) => self.compile_return(ret.value.as_deref())?,
       Expr::Binary(bin) => self.compile_binary(&bin.left, &bin.right, &bin.op)?,
       Expr::Unary(un) => self.compile_unary(&un.op, &un.expr)?,
-      Expr::Super_ => return Err(CompileError::Unsupported("super (no SendSuper yet)")),
-      _ => return Err(CompileError::Unsupported("this expression kind")),
+      Expr::Super_ => {
+        return Err(CompileError::Unsupported(
+          "super (no SendSuper yet)".to_string(),
+        ));
+      }
+      other => return Err(CompileError::Unsupported(format!("expression: {other:?}"))),
     }
     Ok(())
   }
@@ -513,7 +531,9 @@ impl MethodCompiler<'_> {
 
   fn compile_assign(&mut self, left: &Expr, right: &Expr) -> Result<(), CompileError> {
     let Expr::Field(field) = left else {
-      return Err(CompileError::Unsupported("assignment target"));
+      return Err(CompileError::Unsupported(format!(
+        "assignment target: {left:?}"
+      )));
     };
 
     if matches!(*field.base, Expr::Self_) {
@@ -538,7 +558,9 @@ impl MethodCompiler<'_> {
 
   fn compile_call(&mut self, callee: &Expr, args: &[Expr]) -> Result<(), CompileError> {
     let Expr::Field(field) = callee else {
-      return Err(CompileError::Unsupported("call target"));
+      return Err(CompileError::Unsupported(format!(
+        "call target: {callee:?}"
+      )));
     };
 
     if matches!(*field.base, Expr::Self_) {
@@ -549,8 +571,8 @@ impl MethodCompiler<'_> {
     for arg in args {
       self.compile_expr(arg)?;
     }
-    let arg_count =
-      u8::try_from(args.len()).map_err(|_| CompileError::Unsupported("more than 255 args"))?;
+    let arg_count = u8::try_from(args.len())
+      .map_err(|_| CompileError::Unsupported("more than 255 args".to_string()))?;
     self.emit_send(&field.name, arg_count);
     Ok(())
   }
@@ -565,7 +587,7 @@ impl MethodCompiler<'_> {
       self.compile_expr(param)?;
     }
     let arg_count = u8::try_from(params.len())
-      .map_err(|_| CompileError::Unsupported("more than 255 constructor args"))?;
+      .map_err(|_| CompileError::Unsupported("more than 255 constructor args".to_string()))?;
     self.emit(Instr::NewInstance {
       class: class_id,
       arg_count,

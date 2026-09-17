@@ -2,7 +2,7 @@ object pepita {
   const name = "pepita"
 
   method saludar() {
-    return name
+    return "Hola! soy " + name
   }
 }
 
@@ -24,8 +24,4 @@ class Dog inherits Animal {
   override fallible method eat() = "Eating dog food"
 }
 
-const animal = new Dog()
-
-animal.speak()
-
-pepita.saludar()
+console.println(pepita.saludar())

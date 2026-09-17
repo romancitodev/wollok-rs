@@ -1429,6 +1429,7 @@ dependencies = [
 name = "wollok-std"
 version = "0.1.0"
 dependencies = [
+ "hashbrown",
  "wollok-vm",
 ]
 

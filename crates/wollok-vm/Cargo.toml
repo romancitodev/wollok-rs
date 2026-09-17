@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-hashbrown = "0.17.1"
+hashbrown.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]

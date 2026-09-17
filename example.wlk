@@ -41,3 +41,6 @@ const expr1 = 1 + 2 * 3    // Debería ser: 1 + (2 * 3) = 7
 const expr2 = (1 + 2) * 3  // Debería ser: (1 + 2) * 3 = 9
 const expr3 = (1 + 2) * (3 - 4)
 const expr4 = (1 + 2 * 3 - 4)
+
+
+console.log(expr1) // Debería imprimir: 7

@@ -1,10 +1,5 @@
-//! Defaults every heap object falls back to when its own class doesn't
-//! define the selector itself — registered under `PrimitiveKind::Object`,
-//! the closest thing this VM has today to a root `Object` class. **Not**
-//! real inheritance: there's still no `inherits`/`with`/`super`
-//! linearization (see `docs/backlog.md` item 4) — a class that *does*
-//! define `toString` always wins, this is only consulted once `vm.rs`'s
-//! `Send` (or `Vm::send`) finds nothing in the class's own vtable.
+//! Defaults every heap object falls back to when its own class has no
+//! selector for it. Not real inheritance, see docs/backlog.md item 4.
 
 use wollok_vm::native::{NativeTable, PrimitiveKind};
 use wollok_vm::program::Program;
@@ -27,6 +22,7 @@ fn to_string(vm: &mut Vm, program: &Program, this: Value, _args: &[Value]) -> Va
 #[cfg(test)]
 mod tests {
   use super::*;
+  use hashbrown::HashMap;
   use wollok_vm::heap::ClassId;
 
   #[test]
@@ -36,7 +32,7 @@ mod tests {
 
     let mut vm = Vm::new();
     let mut program = Program::default();
-    let class = program.classes.define("Bird", 0, None, Default::default());
+    let class = program.classes.define("Bird", 0, None, HashMap::default());
     assert_eq!(class, ClassId(0));
 
     let obj = Value::from(vm.heap.alloc(class, vec![]));

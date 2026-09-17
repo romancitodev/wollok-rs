@@ -13,6 +13,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-log = "0.2"
 criterion = { version = "0.8.2", features = ["stable"] }
+hashbrown = "0.17.1"
 
 [dependencies]
 wollok-ast.path = "./crates/wollok-ast"

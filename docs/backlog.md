@@ -57,13 +57,23 @@ ya estaba anotada acá, no la small-string-optimization (más trabajo, no
 hacía falta todavía). Sigue siendo unboxed: ningún `HeapObject` ni `Rc<str>`
 de por medio, tal como pide el principio de primitivos en `vm-design.md`.
 
-## 3. `console.println` (o como se llame) para poder ver algo
+## 3. ~~`console.println`~~ — hecho
 
-No hay ninguna forma de sacar un valor del programa salvo el resultado final
-de `main`. Con dispatch nativo (ítem 2) ya resuelto, esto es agregar un
-selector nativo más (`println`/`log`, 1 arg) que imprima usando `toString`.
-No bloquea nada más, pero es lo que hace que probar código deje de requerir
-mirar el valor de retorno por consola de `wollok_rs`.
+`console` es un singleton compilado desde Wollok fuente de verdad
+(`wollok-std`'s `console::SRC`, fusionado al `Scope` del usuario en
+`compile()`), no algo que el compilador conozca por nombre. Su método
+`println(obj)` está declarado `native` (sin cuerpo) en ese fuente, y se
+resuelve en runtime por nombre de clase (`NativeTable::register_for_class`),
+no por `ClassId` (que no se conoce todavía al momento de registrar el
+nativo). Acepta cualquier cantidad de argumentos (`register_variadic_for_class`,
+`Arity::Any`), no solo uno, porque la aridad de un selector Wollok es fija
+por diseño y no alcanza para expresar variádicos.
+
+De paso se agregó la palabra clave `native` al lenguaje (lexer + AST +
+parser, mismo patrón que `abstract`), y se arregló que `parse_object_body`
+no soportaba prefijos (`override`/`fallible`/`abstract`/`native`) por usar
+`parse_item` en vez de `parse_class_item` — un bug preexistente, no algo
+que introdujera esta pieza.
 
 ## 4. Resto (no bloqueante, más lejos)
 
