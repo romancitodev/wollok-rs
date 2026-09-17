@@ -9,16 +9,15 @@ pub use unicode::*;
 
 /// Helper para crear parsers que ignoran ciertos tokens
 pub fn ignore_whitespace<'t, F, O>(
-    mut parser: F,
+  mut parser: F,
 ) -> impl FnMut(&mut crate::error::Src<'t>) -> winnow::Result<O>
 where
-    F: Parser<crate::error::Src<'t>, O, winnow::error::ContextError>,
+  F: Parser<crate::error::Src<'t>, O, winnow::error::ContextError>,
 {
-    move |input| {
-        // Consumimos whitespace antes del parser
-        let _ =
-            winnow::token::take_while(0.., |c: char| c == ' ' || c == '\t').parse_next(input)?;
+  move |input| {
+    // Consumimos whitespace antes del parser
+    let _ = winnow::token::take_while(0.., |c: char| c == ' ' || c == '\t').parse_next(input)?;
 
-        parser.parse_next(input)
-    }
+    parser.parse_next(input)
+  }
 }

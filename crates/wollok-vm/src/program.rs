@@ -8,8 +8,8 @@ use crate::value::Value;
 /// string — `strings` too; see `crate::strings::StringTable`).
 #[derive(Debug, Default)]
 pub struct Program {
-    pub methods: MethodTable,
-    pub classes: ClassTable,
-    pub selectors: SelectorTable,
-    pub consts: Vec<Value>,
+  pub methods: MethodTable,
+  pub classes: ClassTable,
+  pub selectors: SelectorTable,
+  pub consts: Vec<Value>,
 }

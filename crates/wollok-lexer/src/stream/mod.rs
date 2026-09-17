@@ -3,156 +3,156 @@ use std::collections::VecDeque;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
-    error::{Result, Src},
-    parsers::{
-        CommentParser, IdentifierParser, KeywordParser, LiteralParser, PunctuationParser,
-        TokenParser, WhitespaceParser,
-    },
-    token::SpannedToken,
+  error::{Result, Src},
+  parsers::{
+    CommentParser, IdentifierParser, KeywordParser, LiteralParser, PunctuationParser, TokenParser,
+    WhitespaceParser,
+  },
+  token::SpannedToken,
 };
 
 use winnow::{Parser, combinator::alt, error::ParserError};
 
 pub struct TokenStream<'t> {
-    input: Src<'t>,
-    finished: bool,
+  input: Src<'t>,
+  finished: bool,
 }
 
 impl<'t> TokenStream<'t> {
-    #[must_use]
-    pub fn new(input: &'t str) -> Self {
-        debug!(
-            "Creating new TokenStream with input length: {}",
-            input.len()
-        );
-        trace!(
-            "Input preview: {:?}",
-            &input.chars().take(50).collect::<String>()
-        );
-        Self {
-            input: Src::new(input),
-            finished: false,
-        }
+  #[must_use]
+  pub fn new(input: &'t str) -> Self {
+    debug!(
+      "Creating new TokenStream with input length: {}",
+      input.len()
+    );
+    trace!(
+      "Input preview: {:?}",
+      &input.chars().take(50).collect::<String>()
+    );
+    Self {
+      input: Src::new(input),
+      finished: false,
+    }
+  }
+
+  /// Intenta parsear el siguiente token
+  fn next_token(&mut self) -> Result<'t, Option<SpannedToken>> {
+    if self.finished {
+      trace!("TokenStream already finished");
+      return Ok(None);
     }
 
-    /// Intenta parsear el siguiente token
-    fn next_token(&mut self) -> Result<'t, Option<SpannedToken>> {
-        if self.finished {
-            trace!("TokenStream already finished");
-            return Ok(None);
-        }
+    if self.input.is_empty() {
+      debug!("Reached end of input, finishing TokenStream");
+      self.finished = true;
+      return Ok(None);
+    }
 
-        if self.input.is_empty() {
-            debug!("Reached end of input, finishing TokenStream");
-            self.finished = true;
-            return Ok(None);
-        }
+    trace!(
+      "Attempting to parse next token from: {:?}",
+      &self.input.to_string().chars().take(20).collect::<String>()
+    );
 
-        trace!(
-            "Attempting to parse next token from: {:?}",
-            &self.input.to_string().chars().take(20).collect::<String>()
+    if let Ok(None) = WhitespaceParser::parse(&mut self.input) {
+      trace!("Skipped whitespace, trying next token");
+      return self.next_token();
+    }
+
+    let result = alt((
+      CommentParser::parse,     // Comentarios
+      KeywordParser::parse,     // Keywords antes que identifiers
+      LiteralParser::parse,     // Literales (números, strings, booleans)
+      IdentifierParser::parse,  // Identificadores
+      PunctuationParser::parse, // Puntuación / operadores
+    ))
+    .parse_next(&mut self.input);
+
+    match result {
+      Ok(Some(token)) => {
+        debug!("Successfully parsed token: {:?}", token);
+        Ok(Some(token))
+      }
+      Ok(None) => {
+        // Ningún parser pudo manejar el input, esto es un error
+        warn!(
+          "No parser could handle input starting with: {:?}",
+          &self.input.to_string().chars().take(10).collect::<String>()
         );
+        self.finished = true;
+        Err(crate::error::LexerErr::from_input(&self.input))
+      }
+      Err(e) => {
+        warn!("Parser error encountered: {:?}", e);
+        self.finished = true;
+        Err(e)
+      }
+    }
+  }
 
-        if let Ok(None) = WhitespaceParser::parse(&mut self.input) {
-            trace!("Skipped whitespace, trying next token");
-            return self.next_token();
-        }
+  /// Recolecta todos los tokens restantes en un Vec
+  ///
+  /// # Errors
+  /// Retorna un error si ocurre un error de lexer al parsear los tokens.
+  pub fn collect_all(mut self) -> Result<'t, Vec<SpannedToken>> {
+    info!("Starting token collection for entire input");
+    let mut tokens = Vec::new();
 
-        let result = alt((
-            CommentParser::parse,     // Comentarios
-            KeywordParser::parse,     // Keywords antes que identifiers
-            LiteralParser::parse,     // Literales (números, strings, booleans)
-            IdentifierParser::parse,  // Identificadores
-            PunctuationParser::parse, // Puntuación / operadores
-        ))
-        .parse_next(&mut self.input);
-
-        match result {
-            Ok(Some(token)) => {
-                debug!("Successfully parsed token: {:?}", token);
-                Ok(Some(token))
-            }
-            Ok(None) => {
-                // Ningún parser pudo manejar el input, esto es un error
-                warn!(
-                    "No parser could handle input starting with: {:?}",
-                    &self.input.to_string().chars().take(10).collect::<String>()
-                );
-                self.finished = true;
-                Err(crate::error::LexerErr::from_input(&self.input))
-            }
-            Err(e) => {
-                warn!("Parser error encountered: {:?}", e);
-                self.finished = true;
-                Err(e)
-            }
-        }
+    while let Some(token) = self.next()? {
+      tokens.push(token);
     }
 
-    /// Recolecta todos los tokens restantes en un Vec
-    ///
-    /// # Errors
-    /// Retorna un error si ocurre un error de lexer al parsear los tokens.
-    pub fn collect_all(mut self) -> Result<'t, Vec<SpannedToken>> {
-        info!("Starting token collection for entire input");
-        let mut tokens = Vec::new();
+    info!("Successfully collected {} tokens", tokens.len());
+    debug!(
+      "Token types: {:?}",
+      tokens.iter().map(|t| &t.token).collect::<Vec<_>>()
+    );
+    Ok(tokens)
+  }
 
-        while let Some(token) = self.next()? {
-            tokens.push(token);
-        }
+  /// Recolecta todos los tokens restantes en un `VecDeque` (para compatibilidad)
+  ///
+  /// # Errors
+  /// Retorna un error si ocurre un error de lexer al parsear los tokens.
+  pub fn collect_deque(mut self) -> Result<'t, VecDeque<SpannedToken>> {
+    let mut tokens = VecDeque::new();
 
-        info!("Successfully collected {} tokens", tokens.len());
-        debug!(
-            "Token types: {:?}",
-            tokens.iter().map(|t| &t.token).collect::<Vec<_>>()
-        );
-        Ok(tokens)
+    while let Some(token) = self.next()? {
+      tokens.push_back(token);
     }
 
-    /// Recolecta todos los tokens restantes en un `VecDeque` (para compatibilidad)
-    ///
-    /// # Errors
-    /// Retorna un error si ocurre un error de lexer al parsear los tokens.
-    pub fn collect_deque(mut self) -> Result<'t, VecDeque<SpannedToken>> {
-        let mut tokens = VecDeque::new();
-
-        while let Some(token) = self.next()? {
-            tokens.push_back(token);
-        }
-
-        Ok(tokens)
-    }
+    Ok(tokens)
+  }
 }
 
 impl<'t> Iterator for TokenStream<'t> {
-    type Item = Result<'t, SpannedToken>;
+  type Item = Result<'t, SpannedToken>;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.next_token() {
-            Ok(Some(token)) => Some(Ok(token)),
-            Ok(None) => None,
-            Err(e) => Some(Err(e)),
-        }
+  fn next(&mut self) -> Option<Self::Item> {
+    match self.next_token() {
+      Ok(Some(token)) => Some(Ok(token)),
+      Ok(None) => None,
+      Err(e) => Some(Err(e)),
     }
+  }
 }
 
 // Implementación de next() que retorna Result<Option<SpannedToken>>
 impl<'t> TokenStream<'t> {
-    /// Versión de `next()` que retorna Result en lugar de Option<Result>
-    fn next(&mut self) -> Result<'t, Option<SpannedToken>> {
-        self.next_token()
-    }
+  /// Versión de `next()` que retorna Result en lugar de Option<Result>
+  fn next(&mut self) -> Result<'t, Option<SpannedToken>> {
+    self.next_token()
+  }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{T, ident, kw, lit};
+  use crate::{T, ident, kw, lit};
 
-    use super::*;
+  use super::*;
 
-    #[test]
-    fn test_full_example() {
-        let source = "import trenes.*
+  #[test]
+  fn test_full_example() {
+    let source = "import trenes.*
 
 class Deposito {
   const formaciones = []
@@ -160,163 +160,163 @@ class Deposito {
   method vagonesMasPesados() { return formaciones.map({ tren => tren.vagonMasPesado() }) }
 }
 ";
-        let stream = TokenStream::new(source);
-        let tokens = stream.collect_all().unwrap();
+    let stream = TokenStream::new(source);
+    let tokens = stream.collect_all().unwrap();
 
-        assert_eq!(
-            tokens,
-            vec![
-                kw!(Import),
-                ident!("trenes"),
-                T!(Dot),
-                T!(Multiply),
-                T!(Newline),
-                T!(Newline),
-                kw!(Class),
-                ident!("Deposito"),
-                T![OpenBrace],
-                T![Newline],
-                kw!(Const),
-                ident!("formaciones"),
-                T![Equals],
-                T![OpenSquareBracket],
-                T![CloseSquareBracket],
-                T![Newline],
-                kw!(Method),
-                ident!("agregarFormacion"),
-                T![OpenParen],
-                ident!("unTren"),
-                T![CloseParen],
-                T![OpenBrace],
-                ident!("formaciones"),
-                T![Dot],
-                ident!("add"),
-                T![OpenParen],
-                ident!("unTren"),
-                T![CloseParen],
-                T![CloseBrace],
-                T![Newline],
-                kw!(Method),
-                ident!("vagonesMasPesados"),
-                T![OpenParen],
-                T![CloseParen],
-                T![OpenBrace],
-                kw![Return],
-                ident!("formaciones"),
-                T![Dot],
-                ident!("map"),
-                T![OpenParen],
-                T![OpenBrace],
-                ident!("tren"),
-                T![FatArrow],
-                ident!("tren"),
-                T![Dot],
-                ident!("vagonMasPesado"),
-                T![OpenParen],
-                T![CloseParen],
-                T![CloseBrace],
-                T![CloseParen],
-                T![CloseBrace],
-                T![Newline],
-                T![CloseBrace],
-                T![Newline]
-            ]
-        );
-    }
+    assert_eq!(
+      tokens,
+      vec![
+        kw!(Import),
+        ident!("trenes"),
+        T!(Dot),
+        T!(Multiply),
+        T!(Newline),
+        T!(Newline),
+        kw!(Class),
+        ident!("Deposito"),
+        T![OpenBrace],
+        T![Newline],
+        kw!(Const),
+        ident!("formaciones"),
+        T![Equals],
+        T![OpenSquareBracket],
+        T![CloseSquareBracket],
+        T![Newline],
+        kw!(Method),
+        ident!("agregarFormacion"),
+        T![OpenParen],
+        ident!("unTren"),
+        T![CloseParen],
+        T![OpenBrace],
+        ident!("formaciones"),
+        T![Dot],
+        ident!("add"),
+        T![OpenParen],
+        ident!("unTren"),
+        T![CloseParen],
+        T![CloseBrace],
+        T![Newline],
+        kw!(Method),
+        ident!("vagonesMasPesados"),
+        T![OpenParen],
+        T![CloseParen],
+        T![OpenBrace],
+        kw![Return],
+        ident!("formaciones"),
+        T![Dot],
+        ident!("map"),
+        T![OpenParen],
+        T![OpenBrace],
+        ident!("tren"),
+        T![FatArrow],
+        ident!("tren"),
+        T![Dot],
+        ident!("vagonMasPesado"),
+        T![OpenParen],
+        T![CloseParen],
+        T![CloseBrace],
+        T![CloseParen],
+        T![CloseBrace],
+        T![Newline],
+        T![CloseBrace],
+        T![Newline]
+      ]
+    );
+  }
 
-    #[test]
-    fn test_class_example() {
-        let source = "class Animal { property energy = 10 }";
-        let stream = TokenStream::new(source);
-        let tokens = stream.collect_all().unwrap();
+  #[test]
+  fn test_class_example() {
+    let source = "class Animal { property energy = 10 }";
+    let stream = TokenStream::new(source);
+    let tokens = stream.collect_all().unwrap();
 
-        assert_eq!(
-            tokens,
-            vec![
-                kw!(Class),
-                ident!("Animal"),
-                T!(OpenBrace),
-                kw!(Property),
-                ident!("energy"),
-                T!(Equals),
-                lit!(10),
-                T!(CloseBrace)
-            ]
-        );
-    }
+    assert_eq!(
+      tokens,
+      vec![
+        kw!(Class),
+        ident!("Animal"),
+        T!(OpenBrace),
+        kw!(Property),
+        ident!("energy"),
+        T!(Equals),
+        lit!(10),
+        T!(CloseBrace)
+      ]
+    );
+  }
 
-    #[test]
-    fn test_self_example() {
-        let source = "object dummy { method run() = self }";
-        let stream = TokenStream::new(source);
-        let tokens = stream.collect_all().unwrap();
-        assert_eq!(
-            tokens,
-            vec![
-                kw!(Object),
-                ident!("dummy"),
-                T!(OpenBrace),
-                kw!(Method),
-                ident!("run"),
-                T!(OpenParen),
-                T!(CloseParen),
-                T!(Equals),
-                kw!(This),
-                T!(CloseBrace)
-            ]
-        );
-    }
+  #[test]
+  fn test_self_example() {
+    let source = "object dummy { method run() = self }";
+    let stream = TokenStream::new(source);
+    let tokens = stream.collect_all().unwrap();
+    assert_eq!(
+      tokens,
+      vec![
+        kw!(Object),
+        ident!("dummy"),
+        T!(OpenBrace),
+        kw!(Method),
+        ident!("run"),
+        T!(OpenParen),
+        T!(CloseParen),
+        T!(Equals),
+        kw!(This),
+        T!(CloseBrace)
+      ]
+    );
+  }
 
-    #[test]
-    fn test_code_example() {
-        let source = "object dummy {\n\tconst age = 42 }";
-        let stream = TokenStream::new(source);
-        let tokens = stream.collect_all().unwrap();
-        assert_eq!(
-            tokens,
-            vec![
-                kw!(Object),
-                ident!("dummy"),
-                T!(OpenBrace),
-                T!(Newline),
-                kw!(Const),
-                ident!("age"),
-                T!(Equals),
-                lit!(42),
-                T!(CloseBrace)
-            ]
-        );
-    }
+  #[test]
+  fn test_code_example() {
+    let source = "object dummy {\n\tconst age = 42 }";
+    let stream = TokenStream::new(source);
+    let tokens = stream.collect_all().unwrap();
+    assert_eq!(
+      tokens,
+      vec![
+        kw!(Object),
+        ident!("dummy"),
+        T!(OpenBrace),
+        T!(Newline),
+        kw!(Const),
+        ident!("age"),
+        T!(Equals),
+        lit!(42),
+        T!(CloseBrace)
+      ]
+    );
+  }
 
-    #[test]
-    fn test_empty_input() {
-        let mut stream = TokenStream::new("");
-        assert!(stream.next().unwrap().is_none());
-    }
+  #[test]
+  fn test_empty_input() {
+    let mut stream = TokenStream::new("");
+    assert!(stream.next().unwrap().is_none());
+  }
 
-    #[test]
-    fn test_simple_tokens() {
-        let mut stream = TokenStream::new("42 true");
+  #[test]
+  fn test_simple_tokens() {
+    let mut stream = TokenStream::new("42 true");
 
-        // Primer token debería ser el número
-        let Ok(Some(token)) = stream.next() else {
-            panic!("Expected a token");
-        };
+    // Primer token debería ser el número
+    let Ok(Some(token)) = stream.next() else {
+      panic!("Expected a token");
+    };
 
-        assert_eq!(token.token, lit!(42));
+    assert_eq!(token.token, lit!(42));
 
-        let Ok(Some(token)) = stream.next() else {
-            panic!("Expected a token");
-        };
+    let Ok(Some(token)) = stream.next() else {
+      panic!("Expected a token");
+    };
 
-        assert_eq!(token.token, lit!(true));
-    }
+    assert_eq!(token.token, lit!(true));
+  }
 
-    #[test]
-    fn test_collect_all() {
-        let stream = TokenStream::new("42 + 3");
-        let tokens = stream.collect_all().unwrap();
+  #[test]
+  fn test_collect_all() {
+    let stream = TokenStream::new("42 + 3");
+    let tokens = stream.collect_all().unwrap();
 
-        assert_eq!(tokens, vec![lit!(42), T!(Plus), lit!(3)]);
-    }
+    assert_eq!(tokens, vec![lit!(42), T!(Plus), lit!(3)]);
+  }
 }

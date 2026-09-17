@@ -15,8 +15,8 @@ pub mod strings;
 use wollok_vm::vm::Vm;
 
 pub fn install(vm: &mut Vm) {
-    numbers::install(&mut vm.natives);
-    booleans::install(&mut vm.natives);
-    strings::install(&mut vm.natives);
-    objects::install(&mut vm.natives);
+  numbers::install(&mut vm.natives);
+  booleans::install(&mut vm.natives);
+  strings::install(&mut vm.natives);
+  objects::install(&mut vm.natives);
 }

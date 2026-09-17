@@ -35,39 +35,39 @@ pub type NativeFn = fn(&mut Vm, &Program, Value, &[Value]) -> Value;
 /// without an actual entry in `ClassTable`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PrimitiveKind {
-    Int,
-    Float,
-    Bool,
-    Str,
-    /// Not a primitive at all — the fallback bucket for `Value::Object`
-    /// receivers whose class doesn't define the selector itself. The
-    /// closest thing this VM has to a root `Object` class today.
-    Object,
+  Int,
+  Float,
+  Bool,
+  Str,
+  /// Not a primitive at all — the fallback bucket for `Value::Object`
+  /// receivers whose class doesn't define the selector itself. The
+  /// closest thing this VM has to a root `Object` class today.
+  Object,
 }
 
 impl PrimitiveKind {
-    /// `None` for `Null`/`Object` — they don't bypass class-based dispatch
-    /// the way a true primitive does (see `vm.rs`'s `Send`). Use
-    /// `PrimitiveKind::Object` explicitly at the one call site that wants
-    /// the object-defaults bucket instead.
-    #[must_use]
-    pub fn of(value: &Value) -> Option<Self> {
-        match value {
-            Value::Int(_) => Some(Self::Int),
-            Value::Float(_) => Some(Self::Float),
-            Value::Bool(_) => Some(Self::Bool),
-            Value::Str(_) => Some(Self::Str),
-            Value::Null | Value::Object(_) => None,
-        }
+  /// `None` for `Null`/`Object` — they don't bypass class-based dispatch
+  /// the way a true primitive does (see `vm.rs`'s `Send`). Use
+  /// `PrimitiveKind::Object` explicitly at the one call site that wants
+  /// the object-defaults bucket instead.
+  #[must_use]
+  pub fn of(value: &Value) -> Option<Self> {
+    match value {
+      Value::Int(_) => Some(Self::Int),
+      Value::Float(_) => Some(Self::Float),
+      Value::Bool(_) => Some(Self::Bool),
+      Value::Str(_) => Some(Self::Str),
+      Value::Null | Value::Object(_) => None,
     }
+  }
 }
 
 #[derive(Debug)]
 struct Entry {
-    kind: PrimitiveKind,
-    name: &'static str,
-    arity: u8,
-    method: NativeFn,
+  kind: PrimitiveKind,
+  name: &'static str,
+  arity: u8,
+  method: NativeFn,
 }
 
 /// Every native method available at runtime, keyed by `(kind, selector,
@@ -82,21 +82,27 @@ struct Entry {
 /// nested inside a tuple).
 #[derive(Debug, Default)]
 pub struct NativeTable {
-    entries: Vec<Entry>,
+  entries: Vec<Entry>,
 }
 
 impl NativeTable {
-    pub fn register(&mut self, kind: PrimitiveKind, name: &'static str, arity: u8, method: NativeFn) {
-        self.entries.push(Entry { kind, name, arity, method });
-    }
+  pub fn register(&mut self, kind: PrimitiveKind, name: &'static str, arity: u8, method: NativeFn) {
+    self.entries.push(Entry {
+      kind,
+      name,
+      arity,
+      method,
+    });
+  }
 
-    #[must_use]
-    pub fn lookup(&self, kind: PrimitiveKind, selector: &str, arity: u8) -> Option<NativeFn> {
-        self.entries
-            .iter()
-            .find(|e| e.kind == kind && e.arity == arity && e.name == selector)
-            .map(|e| e.method)
-    }
+  #[must_use]
+  pub fn lookup(&self, kind: PrimitiveKind, selector: &str, arity: u8) -> Option<NativeFn> {
+    self
+      .entries
+      .iter()
+      .find(|e| e.kind == kind && e.arity == arity && e.name == selector)
+      .map(|e| e.method)
+  }
 }
 
 /// Looks up and calls a native method on `receiver`. Only for true
@@ -108,17 +114,24 @@ impl NativeTable {
 /// If `receiver`'s kind has no method registered for `selector`/this
 /// arity — same "doesn't understand" contract as a `Send` to an object
 /// whose class has no matching method.
-pub fn dispatch(vm: &mut Vm, program: &Program, selector: &str, receiver: Value, args: &[Value]) -> Value {
-    let arity = u8::try_from(args.len()).expect("more than 255 args");
-    let found = PrimitiveKind::of(&receiver).and_then(|kind| vm.natives.lookup(kind, selector, arity));
-    match found {
-        Some(method) => method(vm, program, receiver, args),
-        None => panic!(
-            "{} does not understand #{}",
-            receiver_kind_name(&receiver),
-            selector
-        ),
-    }
+pub fn dispatch(
+  vm: &mut Vm,
+  program: &Program,
+  selector: &str,
+  receiver: Value,
+  args: &[Value],
+) -> Value {
+  let arity = u8::try_from(args.len()).expect("more than 255 args");
+  let found =
+    PrimitiveKind::of(&receiver).and_then(|kind| vm.natives.lookup(kind, selector, arity));
+  match found {
+    Some(method) => method(vm, program, receiver, args),
+    None => panic!(
+      "{} does not understand #{}",
+      receiver_kind_name(&receiver),
+      selector
+    ),
+  }
 }
 
 /// Human-readable receiver name for "X does not understand #y" panics —
@@ -126,75 +139,76 @@ pub fn dispatch(vm: &mut Vm, program: &Program, selector: &str, receiver: Value,
 /// reach a `Send` that finds nothing.
 #[must_use]
 pub fn receiver_kind_name(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "Null",
-        Value::Bool(_) => "Boolean",
-        Value::Int(_) => "Integer",
-        Value::Float(_) => "Float",
-        Value::Str(_) => "String",
-        Value::Object(_) => "Object",
-    }
+  match value {
+    Value::Null => "Null",
+    Value::Bool(_) => "Boolean",
+    Value::Int(_) => "Integer",
+    Value::Float(_) => "Float",
+    Value::Str(_) => "String",
+    Value::Object(_) => "Object",
+  }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+  use super::*;
 
-    fn always_42(_vm: &mut Vm, _program: &Program, _receiver: Value, _args: &[Value]) -> Value {
-        Value::from(42i64)
-    }
+  fn always_42(_vm: &mut Vm, _program: &Program, _receiver: Value, _args: &[Value]) -> Value {
+    Value::from(42i64)
+  }
 
-    #[test]
-    fn a_registered_method_is_found_by_kind_name_and_arity() {
-        let mut table = NativeTable::default();
-        table.register(PrimitiveKind::Int, "answer", 0, always_42);
+  #[test]
+  fn a_registered_method_is_found_by_kind_name_and_arity() {
+    let mut table = NativeTable::default();
+    table.register(PrimitiveKind::Int, "answer", 0, always_42);
 
-        assert!(table.lookup(PrimitiveKind::Int, "answer", 0).is_some());
-    }
+    assert!(table.lookup(PrimitiveKind::Int, "answer", 0).is_some());
+  }
 
-    #[test]
-    fn wrong_arity_or_wrong_kind_misses() {
-        let mut table = NativeTable::default();
-        table.register(PrimitiveKind::Int, "answer", 0, always_42);
+  #[test]
+  fn wrong_arity_or_wrong_kind_misses() {
+    let mut table = NativeTable::default();
+    table.register(PrimitiveKind::Int, "answer", 0, always_42);
 
-        assert!(table.lookup(PrimitiveKind::Int, "answer", 1).is_none());
-        assert!(table.lookup(PrimitiveKind::Bool, "answer", 0).is_none());
-    }
+    assert!(table.lookup(PrimitiveKind::Int, "answer", 1).is_none());
+    assert!(table.lookup(PrimitiveKind::Bool, "answer", 0).is_none());
+  }
 
-    #[test]
-    fn object_is_a_separate_bucket_from_every_primitive() {
-        let mut table = NativeTable::default();
-        table.register(PrimitiveKind::Object, "toString", 0, always_42);
+  #[test]
+  fn object_is_a_separate_bucket_from_every_primitive() {
+    let mut table = NativeTable::default();
+    table.register(PrimitiveKind::Object, "toString", 0, always_42);
 
-        assert!(table.lookup(PrimitiveKind::Object, "toString", 0).is_some());
-        assert!(table.lookup(PrimitiveKind::Int, "toString", 0).is_none());
-    }
+    assert!(table.lookup(PrimitiveKind::Object, "toString", 0).is_some());
+    assert!(table.lookup(PrimitiveKind::Int, "toString", 0).is_none());
+  }
 
-    #[test]
-    fn dispatch_calls_the_registered_method() {
-        let mut vm = Vm::new();
-        let program = Program::default();
-        vm.natives.register(PrimitiveKind::Int, "answer", 0, always_42);
+  #[test]
+  fn dispatch_calls_the_registered_method() {
+    let mut vm = Vm::new();
+    let program = Program::default();
+    vm.natives
+      .register(PrimitiveKind::Int, "answer", 0, always_42);
 
-        assert_eq!(
-            dispatch(&mut vm, &program, "answer", Value::from(1i64), &[]).as_int(),
-            Some(42)
-        );
-    }
+    assert_eq!(
+      dispatch(&mut vm, &program, "answer", Value::from(1i64), &[]).as_int(),
+      Some(42)
+    );
+  }
 
-    #[test]
-    #[should_panic(expected = "Integer does not understand #nope")]
-    fn dispatch_panics_with_a_clear_message_when_nothing_matches() {
-        let mut vm = Vm::new();
-        let program = Program::default();
-        dispatch(&mut vm, &program, "nope", Value::from(1i64), &[]);
-    }
+  #[test]
+  #[should_panic(expected = "Integer does not understand #nope")]
+  fn dispatch_panics_with_a_clear_message_when_nothing_matches() {
+    let mut vm = Vm::new();
+    let program = Program::default();
+    dispatch(&mut vm, &program, "nope", Value::from(1i64), &[]);
+  }
 
-    #[test]
-    fn receiver_kind_names_match_wollok_class_names() {
-        assert_eq!(receiver_kind_name(&Value::from(1i64)), "Integer");
-        assert_eq!(receiver_kind_name(&Value::from(1.0f64)), "Float");
-        assert_eq!(receiver_kind_name(&Value::from(true)), "Boolean");
-        assert_eq!(receiver_kind_name(&Value::Null), "Null");
-    }
+  #[test]
+  fn receiver_kind_names_match_wollok_class_names() {
+    assert_eq!(receiver_kind_name(&Value::from(1i64)), "Integer");
+    assert_eq!(receiver_kind_name(&Value::from(1.0f64)), "Float");
+    assert_eq!(receiver_kind_name(&Value::from(true)), "Boolean");
+    assert_eq!(receiver_kind_name(&Value::Null), "Null");
+  }
 }

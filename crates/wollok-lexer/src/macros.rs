@@ -26,18 +26,18 @@ pub use ident;
 #[macro_export]
 #[doc(hidden)]
 macro_rules! lit {
-    (Null) => {
-        $crate::token::Token::Literal($crate::token::Literal::Null)
-    };
-    (@raw $i:expr) => {
-        Into::<$crate::token::Token>::into($i)
-    };
-    ($i:expr) => {
-        $crate::token::Token::Literal(Into::<$crate::token::Literal>::into($i))
-    };
-    (@match $i:tt) => {
-        $crate::token::Token::Literal($i)
-    };
+  (Null) => {
+    $crate::token::Token::Literal($crate::token::Literal::Null)
+  };
+  (@raw $i:expr) => {
+    Into::<$crate::token::Token>::into($i)
+  };
+  ($i:expr) => {
+    $crate::token::Token::Literal(Into::<$crate::token::Literal>::into($i))
+  };
+  (@match $i:tt) => {
+    $crate::token::Token::Literal($i)
+  };
 }
 
 #[doc(inline)]
@@ -46,12 +46,12 @@ pub use lit;
 #[macro_export]
 #[doc(hidden)]
 macro_rules! cmt {
-    ($i:expr) => {
-        $crate::token::Token::Comment($i.to_owned())
-    };
-    (@match $i:tt) => {
-        $crate::token::Token::Comment($i)
-    };
+  ($i:expr) => {
+    $crate::token::Token::Comment($i.to_owned())
+  };
+  (@match $i:tt) => {
+    $crate::token::Token::Comment($i)
+  };
 }
 
 #[doc(inline)]
@@ -86,31 +86,31 @@ macro_rules! kw {
 pub use kw;
 
 impl From<i64> for Literal {
-    fn from(value: i64) -> Self {
-        Self::Integer(value)
-    }
+  fn from(value: i64) -> Self {
+    Self::Integer(value)
+  }
 }
 
 impl From<f64> for Literal {
-    fn from(value: f64) -> Self {
-        Self::Float(value)
-    }
+  fn from(value: f64) -> Self {
+    Self::Float(value)
+  }
 }
 
 impl From<bool> for Literal {
-    fn from(value: bool) -> Self {
-        Self::Boolean(value)
-    }
+  fn from(value: bool) -> Self {
+    Self::Boolean(value)
+  }
 }
 
 impl From<String> for Literal {
-    fn from(value: String) -> Self {
-        Self::String(value)
-    }
+  fn from(value: String) -> Self {
+    Self::String(value)
+  }
 }
 
 impl From<&str> for Literal {
-    fn from(value: &str) -> Self {
-        Self::String(value.to_owned())
-    }
+  fn from(value: &str) -> Self {
+    Self::String(value.to_owned())
+  }
 }

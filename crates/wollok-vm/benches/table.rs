@@ -9,37 +9,37 @@ use wollok_vm::heap::ClassId;
 use wollok_vm::program::ClassTable;
 
 fn build_class_table(class_count: usize, methods_per_class: usize) -> (ClassTable, Vec<ClassId>) {
-    let mut classes = ClassTable::default();
-    let mut ids = Vec::with_capacity(class_count);
+  let mut classes = ClassTable::default();
+  let mut ids = Vec::with_capacity(class_count);
 
-    for class_idx in 0..class_count {
-        let mut methods = HashMap::with_capacity(methods_per_class);
+  for class_idx in 0..class_count {
+    let mut methods = HashMap::with_capacity(methods_per_class);
 
-        for method_idx in 0..methods_per_class {
-            methods.insert(
-                MethodNameIdx(method_idx as u32),
-                MethodRef((class_idx * methods_per_class + method_idx) as u32),
-            );
-        }
-
-        ids.push(classes.define(format!("Class{class_idx}"), 0, None, methods));
+    for method_idx in 0..methods_per_class {
+      methods.insert(
+        MethodNameIdx(method_idx as u32),
+        MethodRef((class_idx * methods_per_class + method_idx) as u32),
+      );
     }
 
-    (classes, ids)
+    ids.push(classes.define(format!("Class{class_idx}"), 0, None, methods));
+  }
+
+  (classes, ids)
 }
 
 fn bench_lookup(c: &mut Criterion) {
-    let (classes, ids) = build_class_table(10_000, 16);
-    c.bench_function("lookup on classes", |b| {
-        let mut i = 0usize;
-        b.iter(|| {
-            let class = ids[i % ids.len()];
-            let selector = MethodNameIdx((i % 16) as u32);
+  let (classes, ids) = build_class_table(10_000, 16);
+  c.bench_function("lookup on classes", |b| {
+    let mut i = 0usize;
+    b.iter(|| {
+      let class = ids[i % ids.len()];
+      let selector = MethodNameIdx((i % 16) as u32);
 
-            i = i.wrapping_add(1);
-            black_box(classes.lookup(black_box(class), black_box(selector)));
-        });
+      i = i.wrapping_add(1);
+      black_box(classes.lookup(black_box(class), black_box(selector)));
     });
+  });
 }
 
 criterion_group!(benches, bench_lookup);
