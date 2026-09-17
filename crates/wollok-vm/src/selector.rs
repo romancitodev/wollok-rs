@@ -2,13 +2,10 @@ use std::collections::HashMap;
 
 use crate::bytecode::MethodNameIdx;
 
-/// Wollok allows overloading by arity (`do()` and `do(a)` are different
-/// methods), so a selector is name+arity, not just the name.
+/// name + arity (Wollok overloads by arity: `do()` != `do(a)`)
 type SelectorKey = (String, u8);
 
-/// Interns (name, arity) pairs once so every `Send` only ever compares a
-/// `u32` (`MethodNameIdx`), never a string — string comparison on every
-/// message send would undercut the whole point of inline caching.
+/// Interns (name, arity) so `Send` compares a `u32`, never a string.
 #[derive(Debug, Default)]
 pub struct SelectorTable {
     ids: HashMap<SelectorKey, MethodNameIdx>,
@@ -28,6 +25,18 @@ impl SelectorTable {
         self.entries.push(key.clone());
         self.ids.insert(key, id);
         id
+    }
+
+    /// Read-only counterpart to `intern`: finds an id without creating one.
+    /// Used by code that only has a `&Program` (immutable at runtime — see
+    /// `docs/vm-design.md`), like `Vm::send`, to resolve a selector it
+    /// didn't compile itself (e.g. calling `toString` on an arbitrary
+    /// object from a native method). Only ever finds a hit if *something*
+    /// in the program already interned that exact `(name, arity)` at
+    /// compile time — nothing conjures a new id at runtime.
+    #[must_use]
+    pub fn id_of(&self, name: &str, arity: u8) -> Option<MethodNameIdx> {
+        self.ids.get(&(name.to_owned(), arity)).copied()
     }
 
     #[must_use]

@@ -1,0 +1,11 @@
+[package]
+name = "wollok-compiler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wollok-ast.path = "../wollok-ast"
+wollok-common.path = "../wollok-common"
+wollok-lexer.path = "../wollok-lexer"
+wollok-vm.path = "../wollok-vm"
+hashbrown = "0.17.1"

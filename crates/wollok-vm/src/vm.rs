@@ -1,17 +1,24 @@
-use crate::bytecode::Instr;
+use crate::bytecode::{GlobalIdx, Instr};
 use crate::dispatch::{InlineCacheTable, MethodRef};
 use crate::frame::Frame;
 use crate::heap::Heap;
+use crate::native;
 use crate::program::Program;
+use crate::strings::StringTable;
 use crate::value::Value;
 
-/// Runtime state that changes while executing: the heap and the inline
-/// caches. Everything that's fixed once compiled lives in `Program`
-/// instead (see program.rs for why they're split).
 #[derive(Debug, Default)]
 pub struct Vm {
     pub heap: Heap,
     pub caches: InlineCacheTable,
+    /// One slot per top-level singleton `object`, reserved at compile time.
+    pub globals: Vec<Value>,
+    /// Runtime string storage — see `crate::strings::StringTable` for why
+    /// this lives here and not on `Program`.
+    pub strings: StringTable,
+    /// Native methods on primitives, filled in once (typically by
+    /// `wollok_std::install`) right after `Vm::new()`.
+    pub natives: native::NativeTable,
 }
 
 impl Vm {
@@ -20,18 +27,20 @@ impl Vm {
         Self::default()
     }
 
-    /// Runs one method activation to completion and returns its result.
-    /// Recurses (through the real Rust call stack) on every `Send` — fine
-    /// for now; a VM-managed call stack is a later concern, not a
-    /// correctness one.
+    /// # Panics
+    /// Panics if more than `u32::MAX` globals get compiled.
+    pub fn reserve_global(&mut self) -> GlobalIdx {
+        let idx = self.globals.len();
+        self.globals.push(Value::Null);
+        GlobalIdx(u32::try_from(idx).expect("more globals than u32::MAX"))
+    }
+
+    /// Runs one method to completion and returns its result. Recurses on
+    /// every `Send`.
     ///
     /// # Panics
-    /// Panics on any bytecode invariant violation (stack underflow, a
-    /// `Send` whose receiver isn't an object yet — primitives don't have
-    /// methods of their own until native dispatch exists, a selector the
-    /// receiver's class doesn't implement) and on a handful of
-    /// instructions (`NewArray`, `NewSet`, `NewClosure`, try/catch,
-    /// `SendSuper`) that aren't wired yet.
+    /// On any bytecode invariant violation, and on the instructions not
+    /// wired yet (`NewArray`, `NewSet`, `NewClosure`, try/catch, `SendSuper`).
     pub fn run_method(
         &mut self,
         program: &Program,
@@ -54,6 +63,7 @@ impl Vm {
                 Instr::PushNull => frame.push(Value::Null),
                 Instr::PushTrue => frame.push(Value::from(true)),
                 Instr::PushFalse => frame.push(Value::from(false)),
+                Instr::PushSelf => frame.push(frame.receiver),
 
                 Instr::LoadLocal(slot) => frame.push(frame.locals[slot.0 as usize]),
                 Instr::StoreLocal(slot) => {
@@ -77,6 +87,12 @@ impl Vm {
                     self.heap.write_field(obj, *field, value);
                 }
 
+                Instr::LoadGlobal(idx) => frame.push(self.globals[idx.0 as usize]),
+                Instr::StoreGlobal(idx) => {
+                    let value = frame.pop();
+                    self.globals[idx.0 as usize] = value;
+                }
+
                 Instr::Pop => {
                     frame.pop();
                 }
@@ -91,33 +107,47 @@ impl Vm {
                         *slot = frame.pop();
                     }
                     let receiver_v = frame.pop();
-                    let obj = receiver_v.as_object().unwrap_or_else(|| {
-                        panic!(
-                            "cannot send #{} to a non-object value yet (no native/primitive methods)",
-                            program.selectors.name_of(*method_name)
-                        )
-                    });
-                    let class = self.heap.class_of(obj);
 
-                    let resolved =
-                        if let Some(method_ref) = self.caches.get(*cache_slot).lookup(class) {
-                            method_ref
-                        } else {
-                            let method_ref = program
-                                .classes
-                                .lookup(class, *method_name)
-                                .unwrap_or_else(|| {
-                                    panic!(
+                    let result = match receiver_v.as_object() {
+                        Some(obj) => {
+                            let class = self.heap.class_of(obj);
+                            if let Some(method_ref) = self.caches.get(*cache_slot).lookup(class) {
+                                self.run_method(program, method_ref, receiver_v, call_args)
+                            } else if let Some(method_ref) =
+                                program.classes.lookup(class, *method_name)
+                            {
+                                self.caches.get_mut(*cache_slot).store(class, method_ref);
+                                self.run_method(program, method_ref, receiver_v, call_args)
+                            } else {
+                                // The class itself has nothing for this
+                                // selector — before giving up, try the
+                                // `Object` defaults every object falls
+                                // back to (`toString`, ...). Not real
+                                // inheritance (see docs/backlog.md item 4),
+                                // just the one native fallback bucket.
+                                let selector_name = program.selectors.name_of(*method_name);
+                                match self.natives.lookup(
+                                    native::PrimitiveKind::Object,
+                                    selector_name,
+                                    *arg_count,
+                                ) {
+                                    Some(method) => method(self, program, receiver_v, &call_args),
+                                    None => panic!(
                                         "{} does not understand #{}",
                                         program.classes.name_of(class),
-                                        program.selectors.name_of(*method_name)
-                                    )
-                                });
-                            self.caches.get_mut(*cache_slot).store(class, method_ref);
-                            method_ref
-                        };
-
-                    let result = self.run_method(program, resolved, receiver_v, call_args);
+                                        selector_name
+                                    ),
+                                }
+                            }
+                        }
+                        // Primitives are never heap objects (see
+                        // docs/vm-design.md) — no vtable/inline cache for
+                        // them, straight to the native method table.
+                        None => {
+                            let selector_name = program.selectors.name_of(*method_name);
+                            native::dispatch(self, program, selector_name, receiver_v, &call_args)
+                        }
+                    };
                     frame.push(result);
                 }
 
@@ -132,10 +162,7 @@ impl Vm {
                 Instr::Return => return frame.pop(),
 
                 Instr::NewInstance { class, arg_count } => {
-                    // Constructors aren't wired yet (the parser doesn't
-                    // even have `constructor(...)` yet either) — args are
-                    // consumed off the stack but discarded, fields start
-                    // as Null.
+                    // constructor params not supported yet: args discarded
                     for _ in 0..*arg_count {
                         frame.pop();
                     }
@@ -143,11 +170,47 @@ impl Vm {
                     let obj = self
                         .heap
                         .alloc(*class, vec![Value::Null; field_count as usize]);
+                    if let Some(ctor) = program.classes.ctor(*class) {
+                        self.run_method(program, ctor, Value::from(obj), vec![]);
+                    }
                     frame.push(Value::from(obj));
                 }
 
                 other => todo!("instruction not implemented yet: {other:?}"),
             }
         }
+    }
+
+    /// Sends `selector` to `receiver` — for native methods (`wollok-std`)
+    /// that need to call back into user code, e.g. a `toString` that has
+    /// to run whatever a class actually overrides, falling back to the
+    /// `Object` default otherwise. Unlike a bytecode `Send`, there's no
+    /// call site to cache against, so this always resolves from scratch.
+    ///
+    /// # Panics
+    /// If `receiver` doesn't understand `selector`/this arity.
+    pub fn send(&mut self, program: &Program, receiver: Value, selector: &str, args: Vec<Value>) -> Value {
+        let arity = u8::try_from(args.len()).expect("more than 255 args");
+
+        if let Some(obj) = receiver.as_object() {
+            let class = self.heap.class_of(obj);
+            let overridden = program
+                .selectors
+                .id_of(selector, arity)
+                .and_then(|id| program.classes.lookup(class, id));
+            if let Some(method_ref) = overridden {
+                return self.run_method(program, method_ref, receiver, args);
+            }
+            return match self.natives.lookup(native::PrimitiveKind::Object, selector, arity) {
+                Some(method) => method(self, program, receiver, &args),
+                None => panic!(
+                    "{} does not understand #{}",
+                    program.classes.name_of(class),
+                    selector
+                ),
+            };
+        }
+
+        native::dispatch(self, program, selector, receiver, &args)
     }
 }

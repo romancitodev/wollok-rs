@@ -1,8 +1,12 @@
+use crate::bytecode::StrIdx;
 use crate::heap::ObjRef;
 
-/// A Wollok runtime value. Never match on this directly outside this
-/// module — go through the accessors below, so that if the internal
-/// representation ever changes (packed/boxed), the change stays here.
+/// Only touch via the accessors below, not a direct match, outside this module.
+///
+/// `Str` holds an index into `Vm::strings`, not the bytes themselves —
+/// keeps `Value` cheap and `Copy` (see the arena-heap rationale in
+/// `docs/vm-design.md`) instead of an `Rc<str>` that would need refcounting
+/// on every copy.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Value {
     Null,
@@ -10,6 +14,20 @@ pub enum Value {
     Int(i64),
     Float(f64),
     Object(ObjRef),
+    Str(StrIdx),
+}
+
+impl core::fmt::Display for Value {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Value::Null => write!(f, "null"),
+            Value::Bool(b) => write!(f, "{b}"),
+            Value::Int(n) => write!(f, "{n}"),
+            Value::Float(n) => write!(f, "{n}"),
+            Value::Object(r) => write!(f, "<object {r}>"),
+            Value::Str(idx) => write!(f, "<str {idx:?}>"),
+        }
+    }
 }
 
 impl Value {
@@ -49,6 +67,14 @@ impl Value {
             _ => None,
         }
     }
+
+    #[must_use]
+    pub fn as_str_idx(&self) -> Option<StrIdx> {
+        match self {
+            Value::Str(idx) => Some(*idx),
+            _ => None,
+        }
+    }
 }
 
 impl From<bool> for Value {
@@ -72,6 +98,12 @@ impl From<f64> for Value {
 impl From<ObjRef> for Value {
     fn from(r: ObjRef) -> Self {
         Value::Object(r)
+    }
+}
+
+impl From<StrIdx> for Value {
+    fn from(idx: StrIdx) -> Self {
+        Value::Str(idx)
     }
 }
 

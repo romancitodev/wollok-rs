@@ -1,8 +1,6 @@
 use crate::value::Value;
 
-/// One method activation: `self`, its params+locals addressed by
-/// `SlotIdx`, an operand stack, and the instruction pointer into that
-/// method's code.
+/// One method activation.
 pub struct Frame {
     pub receiver: Value,
     pub locals: Vec<Value>,
@@ -26,8 +24,7 @@ impl Frame {
     }
 
     /// # Panics
-    /// Panics on operand stack underflow — a compiler bug, since correctly
-    /// compiled bytecode never pops more than it pushed.
+    /// On stack underflow.
     pub fn pop(&mut self) -> Value {
         self.stack.pop().expect("operand stack underflow")
     }

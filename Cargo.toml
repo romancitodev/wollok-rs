@@ -12,11 +12,15 @@ owo-colors = "4.2.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-log = "0.2"
+criterion = { version = "0.8.2", features = ["stable"] }
 
 [dependencies]
 wollok-ast.path = "./crates/wollok-ast"
 wollok-lexer.path = "./crates/wollok-lexer"
 wollok-common.path = "./crates/wollok-common"
+wollok-compiler.path = "./crates/wollok-compiler"
+wollok-std.path = "./crates/wollok-std"
+wollok-vm.path = "./crates/wollok-vm"
 tracing-subscriber.workspace = true
 tracing.workspace = true
 owo-colors.workspace = true

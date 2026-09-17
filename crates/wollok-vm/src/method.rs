@@ -5,14 +5,12 @@ use crate::dispatch::MethodRef;
 pub struct Method {
     pub selector: MethodNameIdx,
     pub arity: u8,
-    /// Locals beyond the parameters (params occupy slots `0..arity`),
-    /// so the interpreter knows how big to size a frame's locals array.
+    /// Locals beyond the params (which occupy slots `0..arity`).
     pub extra_locals: u32,
     pub code: Vec<Instr>,
 }
 
-/// All compiled method bodies, indexed by `MethodRef`. A class's vtable
-/// (see class.rs) only ever stores a `MethodRef` into this table.
+/// Compiled method bodies, indexed by `MethodRef`.
 #[derive(Debug, Default)]
 pub struct MethodTable {
     methods: Vec<Method>,

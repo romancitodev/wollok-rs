@@ -8,6 +8,8 @@ use tracing::debug;
 use tracing_subscriber::EnvFilter;
 use wollok_ast::ast::Scope;
 use wollok_lexer::lexer::TokenStream;
+use wollok_vm::value::Value;
+use wollok_vm::vm::Vm;
 
 fn init_tracing() {
     // Configurar tracing simple a stdout
@@ -37,6 +39,19 @@ fn main() -> io::Result<()> {
     println!("{scope}");
 
     debug!("AST Scope: {:#?}", scope);
+
+    let mut vm = Vm::new();
+    wollok_std::install(&mut vm);
+    match wollok_compiler::compile(&scope, &mut vm) {
+        Ok(compiled) => {
+            let result = vm.run_method(&compiled.program, compiled.main, Value::Null, vec![]);
+            match result.as_str_idx() {
+                Some(idx) => println!("=> {:?}", vm.strings.get(idx)),
+                None => println!("=> {result:?}"),
+            }
+        }
+        Err(err) => eprintln!("compile error: {err}"),
+    }
 
     Ok(())
 }

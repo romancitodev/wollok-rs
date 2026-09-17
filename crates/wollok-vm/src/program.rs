@@ -1,14 +1,11 @@
-use crate::class::ClassTable;
+pub use crate::class::ClassTable;
 use crate::method::MethodTable;
 use crate::selector::SelectorTable;
 use crate::value::Value;
 
-/// Everything compiled once, ahead of execution, and never mutated while
-/// running: method bodies, class vtables, the constant pool, and interned
-/// selectors. Kept separate from `Vm` (heap + inline caches, which DO
-/// change while running) so the interpreter loop can hold a method
-/// borrowed from here across recursive calls without fighting the borrow
-/// checker over `&mut self` on a single do-everything struct.
+/// Fixed once compiled. `Vm` holds what changes at runtime (heap, caches,
+/// and — since native methods like `toString` can produce a brand new
+/// string — `strings` too; see `crate::strings::StringTable`).
 #[derive(Debug, Default)]
 pub struct Program {
     pub methods: MethodTable,

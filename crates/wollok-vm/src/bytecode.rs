@@ -11,10 +11,20 @@ pub struct SlotIdx(pub u32);
 pub struct MethodNameIdx(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MethodSlot(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClosureIdx(pub u32);
 
-/// Jump target as an absolute index into the instruction stream, decided
-/// once by the compiler — never a relative offset the VM has to add up.
+/// Index into `Vm::strings`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StrIdx(pub u32);
+
+/// Index into `Vm::globals` — one slot per top-level singleton `object`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct GlobalIdx(pub u32);
+
+/// Absolute index into the instruction stream, not a relative offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstrIdx(pub u32);
 
@@ -24,6 +34,8 @@ pub enum Instr {
     PushNull,
     PushTrue,
     PushFalse,
+    /// Pushes the current frame's receiver (needed for self-sends: `foo()`).
+    PushSelf,
 
     LoadLocal(SlotIdx),
     StoreLocal(SlotIdx),
@@ -31,13 +43,12 @@ pub enum Instr {
     LoadField(FieldIdx),
     StoreField(FieldIdx),
 
-    /// Discards the top of the operand stack — e.g. a message send used
-    /// as a statement, whose result nobody wants.
+    LoadGlobal(GlobalIdx),
+    StoreGlobal(GlobalIdx),
+
+    /// Discards the top of the operand stack.
     Pop,
 
-    /// `cache_slot` is reserved by the compiler for every `Send` it
-    /// emits — see dispatch.rs. Never added after the fact: that would
-    /// mean recompiling everything already emitted.
     Send {
         method_name: MethodNameIdx,
         arg_count: u8,

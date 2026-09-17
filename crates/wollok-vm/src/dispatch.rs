@@ -1,31 +1,20 @@
 use crate::heap::ClassId;
 
-/// Points at a compiled method. Opaque placeholder until methods actually
-/// have compiled bodies to point to.
+/// Points at a compiled method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MethodRef(pub u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CacheSlotIdx(pub u32);
 
-/// Real-world call-sites almost never see more than a handful of distinct
-/// receiver classes (Hölzle/Chambers/Ungar, ECOOP '91) — 4 slots covers
-/// that without needing a hashmap.
+/// 4 covers the vast majority of real call-site polymorphism (Hölzle et al, ECOOP '91).
 const POLYMORPHIC_CACHE_SIZE: usize = 4;
 
-/// One polymorphic inline cache per `Send`/`SendSuper` call-site: up to
-/// `POLYMORPHIC_CACHE_SIZE` (class, method) pairs, checked linearly (cheap
-/// specifically because the array is tiny — no hashing, fits in a cache
-/// line). A call site that only ever sees one class behaves exactly like
-/// the classic monomorphic cache; one that alternates between a handful of
-/// classes doesn't evict on every single call the way a 1-slot cache would.
+/// Per call-site cache: up to 4 (class, method) pairs, linear scan.
 #[derive(Debug, Clone, Copy)]
 pub struct InlineCache {
     entries: [Option<(ClassId, MethodRef)>; POLYMORPHIC_CACHE_SIZE],
-    /// Ring-buffer write cursor, used only once every slot is full — new
-    /// classes evict the oldest entry, not some fancier "least used" pick.
-    /// With this few slots and this little real-world polymorphism, a
-    /// smarter policy isn't worth tracking.
+    /// Ring-buffer cursor: evicts oldest once full.
     next_write: usize,
 }
 
@@ -67,10 +56,7 @@ impl InlineCache {
     }
 }
 
-/// Every inline cache slot the compiler has handed out, indexed by
-/// `CacheSlotIdx`. The compiler reserves a slot for every `Send` it emits,
-/// regardless of whether that call-site turns out hot — retrofitting slots
-/// into already-compiled bytecode would mean recompiling everything.
+/// Every inline cache slot handed out at compile time, indexed by `CacheSlotIdx`.
 #[derive(Debug, Default)]
 pub struct InlineCacheTable {
     slots: Vec<InlineCache>,

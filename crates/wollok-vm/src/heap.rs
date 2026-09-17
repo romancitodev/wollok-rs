@@ -1,10 +1,14 @@
 use crate::value::Value;
 
-/// Index into the heap arena. Objects live in a `Vec`, not behind loose
-/// pointers, so allocation is a push and a future mark-sweep GC can just
-/// walk the arena instead of chasing pointers around the process heap.
+/// Index into the heap arena, not a pointer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ObjRef(u32);
+
+impl core::fmt::Display for ObjRef {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "<object {}>", self.0)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClassId(pub u32);
@@ -47,11 +51,7 @@ impl Heap {
         self.objects[obj.0 as usize].fields[field.0 as usize]
     }
 
-    /// The only way to mutate a field. Every heap mutation routes through
-    /// here on purpose: `write_barrier` is a no-op today, but a future
-    /// generational GC needs a hook at every mutation site, and adding one
-    /// after the fact means re-auditing the whole codebase instead of one
-    /// function.
+    /// Only way to mutate a field — routes through the write barrier hook.
     pub fn write_field(&mut self, obj: ObjRef, field: FieldIdx, value: Value) {
         self.write_barrier(obj, value);
         self.objects[obj.0 as usize].fields[field.0 as usize] = value;
@@ -59,9 +59,7 @@ impl Heap {
 
     #[allow(clippy::unused_self)]
     fn write_barrier(&mut self, _obj: ObjRef, _value: Value) {
-        // no-op: mark-sweep doesn't need this. A generational GC would
-        // record `_obj` in a remembered set here when `_value` points at
-        // a younger-generation object.
+        // no-op until there's a generational GC
     }
 }
 
