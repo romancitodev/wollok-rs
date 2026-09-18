@@ -1446,6 +1446,7 @@ dependencies = [
 name = "wollok_rs"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "owo-colors",
  "tracing",
  "tracing-subscriber",

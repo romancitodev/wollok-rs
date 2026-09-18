@@ -25,3 +25,10 @@ wollok-vm.path = "./crates/wollok-vm"
 tracing-subscriber.workspace = true
 tracing.workspace = true
 owo-colors.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "pipeline"
+harness = false
