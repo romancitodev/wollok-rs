@@ -1,20 +1,20 @@
 #[macro_export]
 macro_rules! stmt {
-    (@item $body:expr) => {
-        $crate::ast::Stmt::Item($body)
-    };
-    (@expr $body:expr) => {
-        $crate::ast::Stmt::Expr($body)
-    };
+  (@item $body:expr) => {
+    $crate::ast::Stmt::Item($body)
+  };
+  (@expr $body:expr) => {
+    $crate::ast::Stmt::Expr($body)
+  };
 }
 
 #[macro_export]
 macro_rules! ident {
-    ($name:expr) => {
-        $crate::item::Ident {
-            name: $name.to_owned(),
-        }
-    };
+  ($name:expr) => {
+    $crate::item::Ident {
+      name: $name.to_owned(),
+    }
+  };
 }
 
 #[macro_export]

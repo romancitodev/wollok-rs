@@ -1,0 +1,8 @@
+[package]
+name = "wollok-std"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wollok-vm.path = "../wollok-vm"
+hashbrown.workspace = true

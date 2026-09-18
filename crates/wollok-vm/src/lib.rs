@@ -1,4 +1,12 @@
 pub mod bytecode;
+pub mod class;
 pub mod dispatch;
+pub mod frame;
 pub mod heap;
+pub mod method;
+pub mod native;
+pub mod program;
+pub mod selector;
+pub mod strings;
 pub mod value;
+pub mod vm;

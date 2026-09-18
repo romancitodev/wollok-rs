@@ -7,74 +7,74 @@
 /// - Top-level statement parsing
 use tracing::trace;
 use wollok_lexer::{
-    macros::{T, kw},
-    token::Token,
+  macros::{T, kw},
+  token::Token,
 };
 
 use crate::{ast::Stmt, expr::Block, source::Ast};
 
 impl Ast<'_> {
-    /// Parses a method body block enclosed in braces, handling statements and expressions
-    pub(crate) fn parse_block(&mut self) -> Block {
-        trace!("Parsing block");
-        let mut stmts = Vec::new();
+  /// Parses a method body block enclosed in braces, handling statements and expressions
+  pub(crate) fn parse_block(&mut self) -> Block {
+    trace!("Parsing block");
+    let mut stmts = Vec::new();
 
-        loop {
-            // Skip whitespace and comments
-            if !self.parse_pre_statement() {
-                break;
-            }
+    loop {
+      // Skip whitespace and comments
+      if !self.parse_pre_statement() {
+        break;
+      }
 
-            // Check for block end
-            if self.check(&T!(CloseBrace)) {
-                break;
-            }
+      // Check for block end
+      if self.check(&T!(CloseBrace)) {
+        break;
+      }
 
-            // Parse statement or expression
-            let stmt = self.parse_statement();
-            stmts.push(stmt);
-        }
-
-        Block { stmts }
+      // Parse statement or expression
+      let stmt = self.parse_statement();
+      stmts.push(stmt);
     }
 
-    /// Parses a single expression inside an inline method body (method = expr).
-    /// The expression may start on the next line (`method foo() =\n    expr`).
-    pub(crate) fn parse_inline_block(&mut self) -> Block {
-        trace!("Parsing inline block");
-        self.skip_trivia();
+    Block { stmts }
+  }
 
-        let stmt = self.parse_expr();
-        trace!("Parsed statement: {:?}", stmt);
+  /// Parses a single expression inside an inline method body (method = expr).
+  /// The expression may start on the next line (`method foo() =\n    expr`).
+  pub(crate) fn parse_inline_block(&mut self) -> Block {
+    trace!("Parsing inline block");
+    self.skip_trivia();
 
-        Block {
-            stmts: vec![Stmt::Expr(stmt)],
-        }
+    let stmt = self.parse_expr();
+    trace!("Parsed statement: {:?}", stmt);
+
+    Block {
+      stmts: vec![Stmt::Expr(stmt)],
     }
+  }
 
-    /// Parses a single statement (can be a local declaration or an expression)
-    /// Only allows `const` and `let` declarations, not `property` (which is class/object level)
-    pub(crate) fn parse_statement(&mut self) -> Stmt {
-        let token = self.peek_expect();
-        match **token {
-            kw!(Object) => self.parse_object(),
-            kw!(Class) => self.parse_class(false),
-            kw!(Abstract) => {
-                self.expect_token(&kw!(Class));
-                self.parse_class(true)
-            }
-            kw!(Import) => self.parse_import(),
-            kw!(Mixin) => self.parse_mixin(),
-            Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
-                token.recover();
-                Stmt::Item(self.parse_item())
-            }
-            _ => {
-                // If it's not a declaration keyword, try to parse it as an expression
-                token.recover();
-                let expr = self.parse_expr();
-                Stmt::Expr(expr)
-            }
-        }
+  /// Parses a single statement (can be a local declaration or an expression)
+  /// Only allows `const` and `let` declarations, not `property` (which is class/object level)
+  pub(crate) fn parse_statement(&mut self) -> Stmt {
+    let token = self.peek_expect();
+    match **token {
+      kw!(Object) => self.parse_object(),
+      kw!(Class) => self.parse_class(false),
+      kw!(Abstract) => {
+        self.expect_token(&kw!(Class));
+        self.parse_class(true)
+      }
+      kw!(Import) => self.parse_import(),
+      kw!(Mixin) => self.parse_mixin(),
+      Token::Keyword(kw!(@raw Let) | kw!(@raw Const)) => {
+        token.recover();
+        Stmt::Item(self.parse_item())
+      }
+      _ => {
+        // If it's not a declaration keyword, try to parse it as an expression
+        token.recover();
+        let expr = self.parse_expr();
+        Stmt::Expr(expr)
+      }
     }
+  }
 }
