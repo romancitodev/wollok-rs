@@ -10,6 +10,7 @@ Una implementación moderna de [Wollok](https://www.wollok.org/) en Rust, enfoca
 
 - [🎯 Objetivo](#-objetivo)
 - [🔥 Progreso reciente](#-progreso-reciente)
+  - [⚠️ Comparación contra Wollok real](#️-comparación-contra-wollok-real-injusta-a-propósito)
 - [✨ Características](#-características)
 - [🚀 Instalación](#-instalación)
 - [📚 Documentación del Lenguaje](#-documentación-del-lenguaje)
@@ -37,6 +38,27 @@ Esto dejó de ser "solo parser": hay un compilador (`wollok-compiler`) que baja 
 - **`property`/`const property` generan getter y setter solos**, como en el Wollok original.
 
 Ejemplos que corren de verdad (no pseudocódigo) en [`examples/`](examples/). Lo que falta (arrays/sets, closures, `inherits`/`super`, try/catch) está en [`docs/backlog.md`](docs/backlog.md); el porqué de cada decisión de diseño de la VM, en [`docs/vm-design.md`](docs/vm-design.md).
+
+### ⚠️ Comparación contra Wollok real (injusta, a propósito)
+
+Empezamos a medir [`wollok-rs`](.) contra `wollok run` (wollok-ts) sobre un corpus chico y aislado en [`bench/`](bench/) — mismos dos programas, escritos una vez en cada dialecto. Con `hyperfine` (proceso completo, arranque incluido):
+
+| Programa | wollok-rs | wollok-ts | 
+|---|---|---|
+| `aritmetica` (30 sends) | ~14 ms | ~1.2 s |
+| `mensajes` (30 sends cruzados) | ~14 ms | ~1.2 s |
+
+Y por dentro, con `criterion` ([`benches/pipeline.rs`](benches/pipeline.rs), sin el print de la comparación anterior para no medir I/O):
+
+| Fase | `aritmetica` | `mensajes` |
+|---|---|---|
+| parseo | ~0.68 ms | ~0.85 ms |
+| + compilación | ~0.72 ms | ~0.97 ms |
+| + ejecución | ~0.72 ms | ~0.98 ms |
+
+**Por qué esto no es una comparación justa todavía:** wollok-ts arranca una VM de Node completa por cada corrida (~1.2 s son mayormente eso, no "correr el programa"); wollok-rs es un binario nativo que arranca casi gratis. Y sobre todo — **wollok-rs tiene casi nada de stdlib real** (unos pocos métodos de `Int`/`Bool`/`Str`, sin `Float`, sin colecciones, sin closures, sin herencia) contra una implementación completa y madura. Comparar tiempos hoy es más "cuánto tarda arrancar cada runtime" que "qué tan rápido corre Wollok" — va a volverse una comparación real a medida que la stdlib y el lenguaje se acerquen en cobertura.
+
+De paso, armar este benchmark encontró un bug real: `wollok-lexer` capturaba un stack backtrace completo (`Backtrace::force_capture()`) en cada intento de match fallido durante el backtracking normal del parser — hasta ~23 veces por token. Cambiarlo a `Backtrace::capture()` (que respeta `RUST_BACKTRACE`, casi gratis si no está seteado) hizo el lexer **~36x más rápido**. Sin este tipo de benchmarks, ese bug seguía ahí.
 
 ## ✨ Características
 
