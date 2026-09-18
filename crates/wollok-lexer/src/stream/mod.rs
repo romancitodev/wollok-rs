@@ -48,11 +48,6 @@ impl<'t> TokenStream<'t> {
       return Ok(None);
     }
 
-    trace!(
-      "Attempting to parse next token from: {:?}",
-      &self.input.to_string().chars().take(20).collect::<String>()
-    );
-
     if let Ok(None) = WhitespaceParser::parse(&mut self.input) {
       trace!("Skipped whitespace, trying next token");
       return self.next_token();

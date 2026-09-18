@@ -69,7 +69,7 @@ impl<'a> ParserError<Src<'a>> for LexerErr<'a> {
       base: input.base(),
       span: input.span(),
       labels: Vec::new(),
-      backtrace: Backtrace::force_capture(),
+      backtrace: Backtrace::capture(),
     }
   }
 }
