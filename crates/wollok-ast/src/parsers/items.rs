@@ -85,6 +85,17 @@ impl Ast<'_> {
     match *item {
       kw!(Const) => {
         trace!("Parsing const declaration");
+        if self.consume(&kw!(Property)) {
+          let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
+          self.expect_token(&T!(Equals));
+          let expr = Box::new(self.parse_expr());
+          debug!("Parsed const property '{}' with expression", name);
+          return Item::Property(ItemProperty {
+            name,
+            expr,
+            readonly: true,
+          });
+        }
         let name = self.expect_match("Expected object identifier", |t| t.into_ident()); // Here we should expect the object ident.
         self.expect_token(&T!(Equals));
         let expr = Box::new(self.parse_expr());
@@ -105,7 +116,11 @@ impl Ast<'_> {
         self.expect_token(&T!(Equals));
         let expr = Box::new(self.parse_expr());
         debug!("Parsed property '{}' with expression", name);
-        Item::Property(ItemProperty { name, expr })
+        Item::Property(ItemProperty {
+          name,
+          expr,
+          readonly: false,
+        })
       }
       kw!(Method) => {
         trace!("Parsing method declaration");

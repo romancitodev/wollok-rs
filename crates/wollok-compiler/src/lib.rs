@@ -129,10 +129,43 @@ pub fn compile(scope: &Scope, vm: &mut Vm) -> Result<Compiled, CompileError> {
     let mut vtable = HashMap::new();
 
     for member in item.body() {
+      if let Item::Property(prop) = member {
+        let getter = program.selectors.intern(&prop.name, 0);
+
+        let idx = info.fields.iter().position(|f| f == &prop.name).unwrap();
+        let field = FieldIdx(u32::try_from(idx).unwrap());
+
+        let getter_method = program.methods.define(Method {
+          selector: getter,
+          arity: 0,
+          extra_locals: 0,
+          code: vec![Instr::LoadField(field), Instr::Return],
+        });
+        vtable.insert(getter, getter_method);
+
+        if !prop.readonly {
+          let setter = program.selectors.intern(&format!("{}=", prop.name), 1);
+          let setter_method = program.methods.define(Method {
+            selector: setter,
+            arity: 1,
+            extra_locals: 0,
+            code: vec![
+              Instr::LoadLocal(SlotIdx(0)), // The argument
+              Instr::StoreField(field),     // Store it in the field
+              Instr::PushNull,
+              Instr::Return,
+            ],
+          });
+
+          vtable.insert(setter, setter_method);
+        }
+        continue;
+      }
+
       let method_item = match member {
         Item::Method(m) => m,
         Item::PrefixedMethod(prefixed) => &prefixed.method,
-        Item::Const(_) | Item::Let(_) | Item::Property(_) => continue,
+        Item::Const(_) | Item::Let(_) => continue,
         other => {
           return Err(CompileError::Unsupported(format!(
             "item inside a class/object body: {other:?}"

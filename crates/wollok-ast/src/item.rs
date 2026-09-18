@@ -35,6 +35,7 @@ pub struct ItemLet {
 pub struct ItemProperty {
   pub name: String,
   pub expr: Box<Expr>,
+  pub readonly: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
