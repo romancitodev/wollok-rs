@@ -36,8 +36,6 @@ fn main() -> io::Result<()> {
   let tokens = TokenStream::new(&path);
   let scope = Scope::from_tokens(&path, tokens);
 
-  println!("{scope}");
-
   debug!("AST Scope: {:#?}", scope);
 
   let mut vm = Vm::new();
