@@ -9,6 +9,7 @@ Una implementación moderna de [Wollok](https://www.wollok.org/) en Rust, enfoca
 ## 📋 Tabla de Contenidos
 
 - [🎯 Objetivo](#-objetivo)
+- [🔥 Progreso reciente](#-progreso-reciente)
 - [✨ Características](#-características)
 - [🚀 Instalación](#-instalación)
 - [📚 Documentación del Lenguaje](#-documentación-del-lenguaje)
@@ -24,6 +25,18 @@ Wollok-rs es una reimplementación de Wollok en Rust que busca:
 - **Modularidad**: Arquitectura basada en crates independientes
 - **Extensibilidad**: Diseño que facilita nuevas características
 - **Compatibilidad**: Mantener la esencia pedagógica de Wollok original
+
+## 🔥 Progreso reciente
+
+Esto dejó de ser "solo parser": hay un compilador (`wollok-compiler`) que baja el AST a bytecode y una VM (`wollok-vm`) que lo corre de punta a punta. `cargo run -- archivo.wlk` ejecuta Wollok de verdad, no solo lo tokeniza.
+
+- **Dispatch por inline cache polimórfica** (4 slots) para los sends a objetos, con el mismo criterio que usan los intérpretes adaptativos de verdad.
+- **Los primitivos (`Int`/`Float`/`Bool`/`Str`) nunca son objetos de heap**: despachan contra una tabla nativa en Rust (`wollok_vm::native`), sin el costo de boxear cada entero.
+- **La stdlib (`wollok-std`) es una crate aparte**, no está hardcodeada en la VM — cada método nativo es una función suelta, registrada por selector, para que crecer la librería no implique tocar el intérprete.
+- **`console` es Wollok real**, compilado como cualquier `object`, con `println` declarado `native` y aridad variable.
+- **`property`/`const property` generan getter y setter solos**, como en el Wollok original.
+
+Ejemplos que corren de verdad (no pseudocódigo) en [`examples/`](examples/). Lo que falta (arrays/sets, closures, `inherits`/`super`, try/catch) está en [`docs/backlog.md`](docs/backlog.md); el porqué de cada decisión de diseño de la VM, en [`docs/vm-design.md`](docs/vm-design.md).
 
 ## ✨ Características
 
@@ -120,6 +133,9 @@ wollok-rs/
 │   ├── wollok-lexer/     # Tokenización y análisis léxico
 │   ├── wollok-ast/       # Parser y AST
 │   ├── wollok-common/    # Tipos y utilidades compartidas
+│   ├── wollok-compiler/  # AST -> bytecode
+│   ├── wollok-vm/        # La VM: heap, dispatch, el intérprete
+│   ├── wollok-std/       # Stdlib nativa (Int/Float/Bool/Str, console)
 │   └── wollok-cli/       # Interfaz de línea de comandos
 └── src/                  # Ejecutable principal
 ```
@@ -128,8 +144,8 @@ wollok-rs/
 
 1. **Lexer** (`wollok-lexer`): Convierte texto a tokens
 2. **Parser** (`wollok-ast`): Genera AST desde tokens
-3. **Análisis** (planeado): Validación semántica
-4. **Evaluación** (planeado): Interpretación del código
+3. **Compilación** (`wollok-compiler`): AST a bytecode
+4. **Ejecución** (`wollok-vm` + `wollok-std`): la VM corre el bytecode, despachando a la stdlib nativa cuando hace falta
 
 ## 🤝 Contribuir
 
