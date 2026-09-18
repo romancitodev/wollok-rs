@@ -13,8 +13,8 @@ test package:
 run args filter="trace":
   with-env { RUST_LOG: "wollok={{filter}}" } { cargo run -- {{args}} }
 
-run-release filter="info":
-  with-env { RUST_LOG: "wollok={{filter}}" } { cargo run --release }
+run-release args filter="info":
+  with-env { RUST_LOG: "wollok={{filter}}" } { cargo run --release  -- {{args}} }
 
 # requires `cargo install cargo-llvm-cov` once
 coverage:
